@@ -35,6 +35,113 @@ st.set_page_config(
     layout="wide",
 )
 
+# ── Amazon-style CSS ──────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+/* Amazon dark header bar */
+[data-testid="stHeader"] {
+    background-color: #232F3E;
+}
+
+/* Primary buttons → Amazon Orange */
+.stButton > button[kind="primary"],
+button[data-testid="stFormSubmitButton"] {
+    background-color: #FF9900 !important;
+    color: #111 !important;
+    border: 1px solid #E88B00 !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+}
+.stButton > button[kind="primary"]:hover,
+button[data-testid="stFormSubmitButton"]:hover {
+    background-color: #E88B00 !important;
+}
+
+/* Secondary buttons */
+.stButton > button:not([kind="primary"]) {
+    border-radius: 8px !important;
+    border: 1px solid #D5D9D9 !important;
+    background: #FFF !important;
+}
+.stButton > button:not([kind="primary"]):hover {
+    background: #F7FAFA !important;
+}
+
+/* Tabs → Amazon style */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 0px;
+    border-bottom: 2px solid #D5D9D9;
+}
+.stTabs [data-baseweb="tab"] {
+    padding: 10px 20px;
+    font-weight: 600;
+    color: #565959;
+}
+.stTabs [aria-selected="true"] {
+    color: #C45500 !important;
+    border-bottom: 3px solid #FF9900 !important;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background-color: #232F3E;
+}
+[data-testid="stSidebar"] * {
+    color: #F2F2F2 !important;
+}
+[data-testid="stSidebar"] .stSelectbox label,
+[data-testid="stSidebar"] .stMultiSelect label,
+[data-testid="stSidebar"] .stRadio label {
+    color: #FF9900 !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    font-size: 0.75rem !important;
+    letter-spacing: 0.03em;
+}
+
+/* Metric cards */
+[data-testid="stMetric"] {
+    background: #FFFFFF;
+    border: 1px solid #D5D9D9;
+    border-radius: 8px;
+    padding: 12px 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+[data-testid="stMetricValue"] {
+    color: #C45500 !important;
+    font-weight: 700 !important;
+}
+
+/* Expanders */
+.streamlit-expanderHeader {
+    font-weight: 600;
+    color: #0F1111;
+    border: 1px solid #D5D9D9;
+    border-radius: 8px;
+}
+
+/* Info/success/warning boxes */
+.stAlert > div[data-baseweb="notification"] {
+    border-radius: 8px !important;
+}
+
+/* Links → Amazon blue */
+a {
+    color: #007185 !important;
+}
+a:hover {
+    color: #C7511F !important;
+    text-decoration: underline !important;
+}
+
+/* Panel/container borders */
+[data-testid="stVerticalBlockBorderWrapper"]:has(> div > [data-testid="stVerticalBlock"] > [data-testid="stMarkdown"]) {
+    border: 1px solid #D5D9D9 !important;
+    border-radius: 8px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -52,7 +159,7 @@ def get_anthropic_client() -> anthropic.Anthropic | None:
 
 
 def impact_color(level: str) -> str:
-    return {"High": "🔴", "Medium": "🟡", "Low": "🟢"}.get(level, "⚪")
+    return {"High": "🟠", "Medium": "🔶", "Low": "🟡"}.get(level, "⚪")
 
 
 def run_pipeline(category: str, days: int, mode: str, status_box, no_cache: bool = False) -> dict | None:
@@ -141,7 +248,13 @@ def run_pipeline(category: str, days: int, mode: str, status_box, no_cache: bool
 # ── UI Components ─────────────────────────────────────────────────────────────
 
 def render_sidebar() -> tuple[list[str], int, str, bool]:
-    st.sidebar.title("📰 Settings")
+    logo = _logo_b64()
+    st.sidebar.markdown(f"""
+    <div style="text-align:center; padding:10px 0 15px;">
+        <img src="data:image/svg+xml;base64,{logo}" style="height:36px; border-radius:6px;" alt="Amazon"/><br>
+        <span style="color:#FF9900; font-size:0.75rem; font-weight:600; letter-spacing:0.05em; margin-top:6px; display:inline-block;">CATEGORY INTEL</span>
+    </div>
+    """, unsafe_allow_html=True)
 
     cats = list_configured_categories(CATEGORY_DIR)
     if not cats:
@@ -255,9 +368,9 @@ def render_quick_report(result: dict) -> None:
     low = [a for a in scored if a.impact_level == "Low"]
 
     for label, group, color in [
-        ("🔴 High Impact", high, "red"),
-        ("🟡 Medium Impact", med, "orange"),
-        ("🟢 Low Impact", low, "green"),
+        ("🟠 High Impact", high, "red"),
+        ("🔶 Medium Impact", med, "orange"),
+        ("🟡 Low Impact", low, "green"),
     ]:
         if not group:
             continue
@@ -409,9 +522,25 @@ def render_manage_categories_tab() -> None:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+def _logo_b64() -> str:
+    logo_path = Path(__file__).parent / "web" / "static" / "amazon_logo_b64.txt"
+    if logo_path.exists():
+        return logo_path.read_text().strip()
+    return ""
+
+
 def main() -> None:
-    st.title("📰 Category News Intelligence")
-    st.caption("Fetch, score, and summarize news for Amazon product categories")
+    logo = _logo_b64()
+    st.markdown(f"""
+    <div style="display:flex; align-items:center; gap:16px; margin-bottom:8px;">
+        <img src="data:image/svg+xml;base64,{logo}" style="height:48px; border-radius:8px;" alt="Amazon"/>
+        <div>
+            <span style="font-size:1.5rem; font-weight:700; color:#232F3E;">Category News Intelligence</span><br>
+            <span style="font-size:0.85rem; color:#565959;">Automated news monitoring for Amazon product categories</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("")
 
     selected_categories, days, mode, no_cache = render_sidebar()
 
