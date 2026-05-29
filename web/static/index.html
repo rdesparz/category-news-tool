@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Category News Intelligence</title>
+<style>
+:root {
+  --blue: #2563eb;
+  --blue-light: #eff6ff;
+  --blue-dark: #1d4ed8;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-500: #6b7280;
+  --gray-700: #374151;
+  --gray-900: #111827;
+  --red: #dc2626;
+  --yellow: #d97706;
+  --green: #16a34a;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, -apple-system, sans-serif; background: var(--gray-50); color: var(--gray-900); line-height: 1.6; }
+
+.container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+header { background: white; border-bottom: 1px solid var(--gray-200); padding: 1rem 0; margin-bottom: 2rem; }
+header .container { display: flex; align-items: center; justify-content: space-between; padding-top: 0; padding-bottom: 0; }
+header h1 { font-size: 1.4rem; color: var(--blue-dark); }
+header .badge { background: var(--blue-light); color: var(--blue); font-size: .75rem; padding: .25rem .6rem; border-radius: 1rem; font-weight: 600; }
+
+.controls { background: white; border-radius: .75rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 2rem; }
+.controls-row { display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; }
+.field { display: flex; flex-direction: column; gap: .3rem; }
+.field label { font-size: .8rem; font-weight: 600; color: var(--gray-500); text-transform: uppercase; letter-spacing: .03em; }
+.field select, .field input { padding: .5rem .75rem; border: 1px solid var(--gray-200); border-radius: .4rem; font-size: .9rem; background: white; }
+.field select:focus, .field input:focus { outline: 2px solid var(--blue); border-color: var(--blue); }
+
+.btn { padding: .55rem 1.2rem; border: none; border-radius: .4rem; font-size: .9rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.btn-primary { background: var(--blue); color: white; }
+.btn-primary:hover { background: var(--blue-dark); }
+.btn-primary:disabled { background: var(--gray-200); color: var(--gray-500); cursor: not-allowed; }
+.btn-secondary { background: var(--gray-100); color: var(--gray-700); border: 1px solid var(--gray-200); }
+.btn-secondary:hover { background: var(--gray-200); }
+
+.status { margin: 1.5rem 0; padding: 1rem; border-radius: .5rem; display: none; }
+.status.loading { display: block; background: var(--blue-light); color: var(--blue-dark); }
+.status.error { display: block; background: #fef2f2; color: var(--red); }
+
+.report { display: none; }
+.report.visible { display: block; }
+
+.report-header { background: white; border-radius: .75rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 1.5rem; }
+.report-header h2 { font-size: 1.3rem; margin-bottom: .5rem; }
+.report-stats { display: flex; gap: 2rem; font-size: .9rem; color: var(--gray-500); }
+.report-stats .stat-value { font-weight: 700; color: var(--gray-900); }
+
+.exec-summary { background: white; border-radius: .75rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 1.5rem; }
+.exec-summary h3 { font-size: 1.05rem; margin-bottom: .75rem; color: var(--blue-dark); }
+.exec-summary ul { padding-left: 1.2rem; }
+.exec-summary li { margin: .4rem 0; }
+
+.section { background: white; border-radius: .75rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 1.5rem; }
+.section-header { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; padding-bottom: .75rem; border-bottom: 1px solid var(--gray-100); }
+.section-header h3 { font-size: 1.05rem; }
+.section-badge { font-size: .7rem; padding: .15rem .5rem; border-radius: .8rem; font-weight: 600; background: var(--gray-100); color: var(--gray-700); }
+
+.article-card { border: 1px solid var(--gray-100); border-radius: .5rem; padding: 1rem; margin-bottom: .75rem; transition: border-color .15s; }
+.article-card:hover { border-color: var(--blue); }
+.article-title { font-weight: 600; margin-bottom: .3rem; }
+.article-title a { color: var(--gray-900); text-decoration: none; }
+.article-title a:hover { color: var(--blue); }
+.article-meta { font-size: .8rem; color: var(--gray-500); display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: .5rem; }
+.impact-badge { font-size: .7rem; padding: .1rem .4rem; border-radius: .3rem; font-weight: 700; }
+.impact-High { background: #fef2f2; color: var(--red); }
+.impact-Medium { background: #fffbeb; color: var(--yellow); }
+.impact-Low { background: #f0fdf4; color: var(--green); }
+.article-summary { font-size: .9rem; color: var(--gray-700); }
+
+.actions { background: white; border-radius: .75rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 1.5rem; border-left: 4px solid var(--blue); }
+.actions h3 { font-size: 1.05rem; margin-bottom: .75rem; color: var(--blue-dark); }
+.actions li { margin: .4rem 0; }
+
+.footer-meta { font-size: .8rem; color: var(--gray-500); text-align: center; padding: 1rem; }
+
+@media (max-width: 640px) {
+  .controls-row { flex-direction: column; align-items: stretch; }
+  .report-stats { flex-direction: column; gap: .5rem; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <h1>📰 Category News Intelligence</h1>
+    <span class="badge">v1.0</span>
+  </div>
+</header>
+
+<div class="container">
+  <div class="controls">
+    <div class="controls-row">
+      <div class="field" style="flex:1;min-width:200px;">
+        <label>Category</label>
+        <select id="categorySelect">
+          <option value="">Loading…</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Lookback</label>
+        <select id="daysSelect">
+          <option value="3">3 days</option>
+          <option value="7" selected>7 days</option>
+          <option value="14">14 days</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Mode</label>
+        <select id="modeSelect">
+          <option value="full">Full Report (LLM)</option>
+          <option value="quick">Quick Scan (no LLM)</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="runBtn" onclick="runReport()">Generate Report</button>
+    </div>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <div class="report" id="report"></div>
+</div>
+
+<script>
+const API = '';
+
+async function loadCategories() {
+  try {
+    const res = await fetch(`${API}/api/categories`);
+    const data = await res.json();
+    const sel = document.getElementById('categorySelect');
+    sel.innerHTML = '';
+    if (data.categories.length === 0) {
+      sel.innerHTML = '<option value="">No categories registered</option>';
+      return;
+    }
+    data.categories.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      sel.appendChild(opt);
+    });
+  } catch (e) {
+    console.error('Failed to load categories:', e);
+  }
+}
+
+function showStatus(msg, type) {
+  const el = document.getElementById('status');
+  el.className = `status ${type}`;
+  el.textContent = msg;
+}
+function hideStatus() {
+  document.getElementById('status').className = 'status';
+}
+
+async function runReport() {
+  const category = document.getElementById('categorySelect').value;
+  const days = document.getElementById('daysSelect').value;
+  const mode = document.getElementById('modeSelect').value;
+
+  if (!category) { showStatus('Please select a category.', 'error'); return; }
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.textContent = 'Processing…';
+  hideStatus();
+  document.getElementById('report').className = 'report';
+
+  showStatus(`Fetching and analyzing news for "${category}"… This may take 30-60 seconds.`, 'loading');
+
+  try {
+    let url;
+    if (mode === 'quick') {
+      url = `${API}/api/report/quick?category=${encodeURIComponent(category)}&days=${days}`;
+    } else {
+      url = `${API}/api/report?category=${encodeURIComponent(category)}&days=${days}&format=json`;
+    }
+    const res = await fetch(url);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    hideStatus();
+
+    if (mode === 'quick') {
+      renderQuickReport(data);
+    } else {
+      renderFullReport(data.report_data || data);
+    }
+  } catch (e) {
+    showStatus(`Error: ${e.message}`, 'error');
+    document.getElementById('report').className = 'report';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate Report';
+  }
+}
+
+function renderFullReport(d) {
+  const el = document.getElementById('report');
+  el.className = 'report visible';
+
+  const execBullets = (d.executive_summary || []).map(b => `<li>${esc(b)}</li>`).join('');
+  const actionBullets = (d.recommended_actions || []).map(a => `<li>${esc(a)}</li>`).join('');
+
+  let sectionsHtml = '';
+  for (const section of (d.sections || [])) {
+    const articles = section.articles.map(a => `
+      <div class="article-card">
+        <div class="article-title"><a href="${esc(a.url)}" target="_blank">${esc(a.title)}</a></div>
+        <div class="article-meta">
+          <span class="impact-badge impact-${a.impact_level}">${a.impact_level}</span>
+          <span>${esc(a.source)}</span>
+          <span>${a.published_date || 'Unknown date'}</span>
+          <span>Score: ${a.relevance_score}/100</span>
+        </div>
+        <div class="article-summary">${esc(a.summary)}</div>
+      </div>
+    `).join('');
+
+    sectionsHtml += `
+      <div class="section">
+        <div class="section-header">
+          <h3>${esc(section.impact_type)}</h3>
+          <span class="section-badge">${section.articles.length} article${section.articles.length !== 1 ? 's' : ''}</span>
+        </div>
+        ${articles}
+      </div>
+    `;
+  }
+
+  el.innerHTML = `
+    <div class="report-header">
+      <h2>📰 ${esc(d.category)} — Weekly Intelligence Report</h2>
+      <div class="report-stats">
+        <span>📅 ${esc(d.date_start)} – ${esc(d.date_end)}</span>
+        <span>📊 <span class="stat-value">${d.articles_analyzed}</span> scanned → <span class="stat-value">${d.relevant_articles}</span> relevant</span>
+      </div>
+    </div>
+
+    <div class="exec-summary">
+      <h3>Executive Summary</h3>
+      <ul>${execBullets || '<li>No summary available.</li>'}</ul>
+    </div>
+
+    ${sectionsHtml}
+
+    <div class="actions">
+      <h3>💡 Recommended Actions</h3>
+      <ul>${actionBullets || '<li>No actions identified.</li>'}</ul>
+    </div>
+
+    <div class="footer-meta">
+      Generated ${esc(d.generated_at || '')} · Sources: ${esc((d.sources_used || []).join(', '))}
+    </div>
+  `;
+}
+
+function renderQuickReport(d) {
+  const el = document.getElementById('report');
+  el.className = 'report visible';
+
+  const cards = (d.articles || []).map(a => `
+    <div class="article-card">
+      <div class="article-title"><a href="${esc(a.url)}" target="_blank">${esc(a.title)}</a></div>
+      <div class="article-meta">
+        <span class="impact-badge impact-${a.impact_level}">${a.impact_level}</span>
+        <span>${esc(a.source)}</span>
+        <span>${a.published_date ? a.published_date.split('T')[0] : 'Unknown'}</span>
+        <span>Score: ${a.relevance_score}/100</span>
+        <span>${esc(a.impact_type)}</span>
+      </div>
+    </div>
+  `).join('');
+
+  el.innerHTML = `
+    <div class="report-header">
+      <h2>⚡ Quick Scan: ${esc(d.category)}</h2>
+      <div class="report-stats">
+        <span>📊 <span class="stat-value">${d.articles_scanned}</span> scanned → <span class="stat-value">${d.articles_relevant}</span> relevant</span>
+      </div>
+    </div>
+    <div class="section">
+      ${cards || '<p style="color:var(--gray-500);">No relevant articles found.</p>'}
+    </div>
+    <div class="footer-meta">Quick scan — no LLM summarization. Switch to "Full Report" for summaries and recommendations.</div>
+  `;
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// Init
+loadCategories();
+</script>
+</body>
+</html>

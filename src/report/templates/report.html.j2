@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Category Report: {{ category }}</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:900px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.6}
+  h1{font-size:1.8rem;border-bottom:3px solid #2563eb;padding-bottom:.5rem}
+  h2{font-size:1.3rem;color:#1d4ed8;margin-top:2rem}
+  h3{font-size:1.1rem;background:#f1f5f9;padding:.4rem .8rem;border-left:4px solid #2563eb;margin-top:1.5rem}
+  h4{margin:.8rem 0 .2rem}
+  h4 a{color:#1d4ed8;text-decoration:none}
+  h4 a:hover{text-decoration:underline}
+  .meta{font-size:.85rem;color:#6b7280;margin-bottom:.4rem}
+  .article{border-bottom:1px solid #e5e7eb;padding-bottom:1rem;margin-bottom:1rem}
+  .high{color:#dc2626;font-weight:bold}
+  .medium{color:#d97706;font-weight:bold}
+  .low{color:#16a34a;font-weight:bold}
+  ul{padding-left:1.5rem}
+  li{margin:.3rem 0}
+  .header-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:.5rem;padding:1rem 1.5rem;margin-bottom:1.5rem}
+  footer{font-size:.8rem;color:#9ca3af;border-top:1px solid #e5e7eb;margin-top:2rem;padding-top:1rem}
+</style>
+</head>
+<body>
+<div class="header-box">
+  <h1>📰 Category News Report: {{ category }}</h1>
+  <p>📅 {{ date_start }} – {{ date_end }}<br>
+  📊 {{ articles_analyzed }} articles scanned → {{ relevant_articles }} relevant</p>
+</div>
+
+<h2>Executive Summary</h2>
+<ul>
+  {% for bullet in executive_summary %}
+  <li>{{ bullet }}</li>
+  {% endfor %}
+</ul>
+
+<h2>Detailed Findings</h2>
+{% for section in sections %}
+<section>
+  <h3>{{ section.impact_type }}</h3>
+  {% for art in section.articles %}
+  <div class="article">
+    <h4><a href="{{ art.url }}">{{ art.title }}</a></h4>
+    <div class="meta">
+      <span class="{{ art.impact_level | lower }}">{{ art.impact_level }}</span>
+      &nbsp;·&nbsp;{{ art.source }}&nbsp;·&nbsp;{{ art.published_date or 'unknown' }}
+      &nbsp;·&nbsp;Score: {{ art.relevance_score }}/100
+    </div>
+    <p>{{ art.summary }}</p>
+  </div>
+  {% endfor %}
+</section>
+{% endfor %}
+
+<h2>Recommended Actions</h2>
+<ul>
+  {% for action in recommended_actions %}
+  <li>{{ action }}</li>
+  {% endfor %}
+</ul>
+
+<footer>
+  <p>Generated: {{ generated_at }}<br>
+  Sources: {{ sources_used | join(', ') }}<br>
+  <em>{{ disclaimer }}</em></p>
+</footer>
+</body>
+</html>

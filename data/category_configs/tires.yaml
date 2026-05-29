@@ -1,0 +1,34 @@
+category: Tires
+keywords:
+  primary:
+    - "tires"
+    - "tire"
+    - "wheels"
+    - "rims"
+    - "rubber"
+  brands:
+    - "Michelin"
+    - "Goodyear"
+    - "Bridgestone"
+    - "Continental"
+    - "Pirelli"
+    - "Cooper Tires"
+    - "Yokohama"
+  supply_chain:
+    - "rubber prices"
+    - "tire tariff"
+    - "tire recall"
+    - "tire shortage"
+    - "raw rubber"
+    - "synthetic rubber"
+  seasonal:
+    - "winter tires"
+    - "all-season tires"
+    - "EV tires"
+    - "tire inflation"
+    - "road safety"
+  regulatory:
+    - "NHTSA"
+    - "tire safety standards"
+    - "tire labeling"
+    - "DOT tire regulations"
