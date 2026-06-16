@@ -82,15 +82,19 @@ button[data-testid="stFormSubmitButton"]:hover {
     border-bottom: 3px solid #FF9900 !important;
 }
 
-/* Sidebar collapse/expand arrow */
-[data-testid="stSidebar"] button[aria-label="Collapse sidebar"],
-[data-testid="collapsedControl"] button {
-    color: #FFFFFF !important;
-}
-[data-testid="stSidebar"] button[aria-label="Collapse sidebar"] svg,
-[data-testid="collapsedControl"] svg {
+/* Sidebar toggle arrows — white in both states */
+[data-testid="stSidebar"] button svg,
+[data-testid="collapsedControl"] svg,
+[data-testid="collapsedControl"] path,
+[data-testid="collapsedControl"] button,
+[data-testid="collapsedControl"] button svg,
+[data-testid="collapsedControl"] button svg path {
     fill: #FFFFFF !important;
     stroke: #FFFFFF !important;
+    color: #FFFFFF !important;
+}
+[data-testid="collapsedControl"] {
+    background-color: #232F3E !important;
 }
 
 /* Sidebar */
