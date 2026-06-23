@@ -35,6 +35,12 @@ st.set_page_config(
     layout="wide",
 )
 
+# Analytics
+st.markdown("""
+<script data-goatcounter="https://resparza.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+""", unsafe_allow_html=True)
+
 # ── Amazon-style CSS ──────────────────────────────────────────────────────────
 st.markdown("""
 <style>
