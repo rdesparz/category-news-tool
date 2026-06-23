@@ -35,12 +35,12 @@ st.set_page_config(
     layout="wide",
 )
 
-# Analytics
-import streamlit.components.v1 as components
-components.html("""
-<script data-goatcounter="https://resparza.goatcounter.com/count"
-        async src="//gc.zgo.at/count.js"></script>
-""", height=0)
+# Analytics — use pixel tracking (JS doesn't work in Streamlit iframes)
+st.markdown(
+    '<img src="https://resparza.goatcounter.com/count?p=/visit&t=Category%20News%20Intelligence" '
+    'style="position:absolute;top:-9999px;" alt="">',
+    unsafe_allow_html=True,
+)
 
 # ── Amazon-style CSS ──────────────────────────────────────────────────────────
 st.markdown("""
