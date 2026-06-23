@@ -256,7 +256,16 @@ def _report_to_excel(file_path: Path) -> bytes | None:
     return buf.getvalue()
 
 
-def run_pipeline(category: str, days: int, mode: str, status_box, no_cache: bool = False) -> dict | None:
+_PRIME_DAY_TERMS = {"prime day", "prime week", "prime deal", "prime deals", "prime big deal", "prime big deals"}
+
+
+def _is_prime_day_article(article) -> bool:
+    """Check if an article mentions Prime Day / Prime Week."""
+    text = f"{article.title} {getattr(article, 'snippet', '')}".lower()
+    return any(term in text for term in _PRIME_DAY_TERMS)
+
+
+def run_pipeline(category: str, days: int, mode: str, status_box, no_cache: bool = False, prime_day_filter: bool = False) -> dict | None:
     """Run the full pipeline; mode is 'full' or 'quick'."""
     config = load_config()
 
@@ -273,6 +282,11 @@ def run_pipeline(category: str, days: int, mode: str, status_box, no_cache: bool
         )
         for d in raw_dicts
     ]
+
+    # Apply Prime Day filter if enabled
+    if prime_day_filter:
+        raw_articles = [a for a in raw_articles if _is_prime_day_article(a)]
+        status_box.info(f"🔥 Prime Day filter: {len(raw_articles)} articles mention Prime Day")
 
     # 2 — Score
     status_box.info(f"🎯 Scoring {len(raw_articles)} articles for relevance…")
@@ -342,7 +356,7 @@ def run_pipeline(category: str, days: int, mode: str, status_box, no_cache: bool
 
 # ── UI Components ─────────────────────────────────────────────────────────────
 
-def render_sidebar() -> tuple[list[str], int, str, bool]:
+def render_sidebar() -> tuple[list[str], int, str, bool, bool]:
     logo = _logo_b64()
     st.sidebar.markdown(f"""
     <div style="text-align:center; padding:10px 0 15px;">
@@ -375,6 +389,10 @@ def render_sidebar() -> tuple[list[str], int, str, bool]:
     no_cache = st.sidebar.checkbox("Bypass cache", help="Force fresh fetch instead of 6-hour cache")
 
     st.sidebar.divider()
+    st.sidebar.markdown("<span style='color:#FF9900; font-weight:600; font-size:0.75rem; letter-spacing:0.03em;'>FILTERS</span>", unsafe_allow_html=True)
+    prime_day_filter = st.sidebar.checkbox("🔥 Prime Day only", help="Show only articles mentioning Prime Day, Prime Week, or Prime deals")
+
+    st.sidebar.divider()
     api_key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
     if api_key_set:
         st.sidebar.success("✓ ANTHROPIC_API_KEY is set — high-quality LLM summaries available")
@@ -384,7 +402,7 @@ def render_sidebar() -> tuple[list[str], int, str, bool]:
             "summaries (snippet + impact framing). Set the key for AI-generated summaries."
         )
 
-    return selected, days, mode, no_cache
+    return selected, days, mode, no_cache, prime_day_filter
 
 
 def render_full_report(report: dict) -> None:
@@ -637,7 +655,7 @@ def main() -> None:
     """, unsafe_allow_html=True)
     st.markdown("")
 
-    selected_categories, days, mode, no_cache = render_sidebar()
+    selected_categories, days, mode, no_cache, prime_day_filter = render_sidebar()
 
     tab_run, tab_manage, tab_history, tab_help = st.tabs(["🚀 Run Report", "⚙️ Manage Categories", "📂 Report History", "❓ How to Use"])
 
@@ -651,7 +669,7 @@ def main() -> None:
                 for cat in selected_categories:
                     st.markdown(f"## {cat}")
                     status = st.empty()
-                    result = run_pipeline(cat, days, mode, status, no_cache=no_cache)
+                    result = run_pipeline(cat, days, mode, status, no_cache=no_cache, prime_day_filter=prime_day_filter)
                     status.empty()
                     if result is None:
                         continue
