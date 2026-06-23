@@ -127,6 +127,14 @@ button[kind="header"] svg,
     font-size: 0.75rem !important;
     letter-spacing: 0.03em;
 }
+/* Multiselect dropdown arrow — navy for visibility */
+[data-testid="stSidebar"] [data-testid="stMultiSelect"] svg {
+    fill: #232F3E !important;
+    stroke: #232F3E !important;
+    color: #232F3E !important;
+    width: 20px !important;
+    height: 20px !important;
+}
 
 /* Metric cards */
 [data-testid="stMetric"] {
