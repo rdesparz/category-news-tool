@@ -36,10 +36,11 @@ st.set_page_config(
 )
 
 # Analytics
-st.markdown("""
+import streamlit.components.v1 as components
+components.html("""
 <script data-goatcounter="https://resparza.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
-""", unsafe_allow_html=True)
+""", height=0)
 
 # ── Amazon-style CSS ──────────────────────────────────────────────────────────
 st.markdown("""
