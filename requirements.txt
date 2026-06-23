@@ -12,3 +12,4 @@ fastapi>=0.110.0
 uvicorn>=0.29.0
 python-multipart>=0.0.9
 streamlit>=1.40.0
+openpyxl>=3.1.0

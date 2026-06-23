@@ -190,6 +190,71 @@ def impact_color(level: str) -> str:
     return {"High": "🟠", "Medium": "🔶", "Low": "🟡"}.get(level, "⚪")
 
 
+def _report_to_excel(file_path: Path) -> bytes | None:
+    """Convert a report JSON file to an Excel workbook. Returns bytes or None."""
+    import io
+    try:
+        import openpyxl
+    except ImportError:
+        return None
+
+    # Only JSON reports can be converted
+    if file_path.suffix == ".json":
+        import json
+        with open(file_path) as f:
+            data = json.load(f)
+    elif file_path.suffix == ".md":
+        # For markdown, try to find a sibling .json
+        json_path = file_path.with_suffix(".json")
+        if json_path.exists():
+            import json
+            with open(json_path) as f:
+                data = json.load(f)
+        else:
+            return None
+    else:
+        return None
+
+    wb = openpyxl.Workbook()
+
+    # Sheet 1: Summary
+    ws = wb.active
+    ws.title = "Summary"
+    ws.append(["Category", data.get("category", "")])
+    ws.append(["Date Range", f"{data.get('date_start', '')} – {data.get('date_end', '')}"])
+    ws.append(["Articles Scanned", data.get("articles_analyzed", 0)])
+    ws.append(["Articles Relevant", data.get("relevant_articles", 0)])
+    ws.append(["Generated", data.get("generated_at", "")])
+    ws.append([])
+    ws.append(["Executive Summary"])
+    for bullet in data.get("executive_summary", []):
+        ws.append(["", bullet])
+    ws.append([])
+    ws.append(["Recommended Actions"])
+    for action in data.get("recommended_actions", []):
+        ws.append(["", action])
+
+    # Sheet 2: Articles
+    ws2 = wb.create_sheet("Articles")
+    ws2.append(["Title", "Source", "Date", "Score", "Impact Level", "Impact Type", "Summary", "URL"])
+    for section in data.get("sections", []):
+        for art in section.get("articles", []):
+            ws2.append([
+                art.get("title", ""),
+                art.get("source", ""),
+                art.get("published_date", ""),
+                art.get("relevance_score", ""),
+                art.get("impact_level", ""),
+                art.get("impact_type", section.get("impact_type", "")),
+                art.get("summary", ""),
+                art.get("url", ""),
+            ])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 def run_pipeline(category: str, days: int, mode: str, status_box, no_cache: bool = False) -> dict | None:
     """Run the full pipeline; mode is 'full' or 'quick'."""
     config = load_config()
@@ -262,9 +327,10 @@ def run_pipeline(category: str, days: int, mode: str, status_box, no_cache: bool
         sources_used=["Google News RSS", "NewsAPI", "GNews"],
     )
 
-    # 5 — Save to disk too
+    # 5 — Save to disk (markdown + json for Excel export)
     output_dir = config.get("report", {}).get("output_dir", "reports")
     saved_path = save_report(report_data, fmt="markdown", output_dir=output_dir)
+    save_report(report_data, fmt="json", output_dir=output_dir)
 
     if using_templates:
         status_box.success(f"✅ Report complete (template mode — no API key). Also saved to `{saved_path}`")
@@ -623,13 +689,23 @@ def main() -> None:
                             cols[0].markdown(f"**{date_dir.name}** · `{f.name}`")
                             cols[1].markdown(f"*{f.stat().st_size // 1024} KB*")
                             with cols[2]:
-                                with open(f, "rb") as fh:
+                                excel_data = _report_to_excel(f)
+                                if excel_data:
                                     st.download_button(
-                                        "Download",
-                                        data=fh.read(),
-                                        file_name=f.name,
+                                        "Download Excel",
+                                        data=excel_data,
+                                        file_name=f"{cat_dir.name}_{date_dir.name}.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                         key=str(f),
                                     )
+                                else:
+                                    with open(f, "rb") as fh:
+                                        st.download_button(
+                                            "Download",
+                                            data=fh.read(),
+                                            file_name=f.name,
+                                            key=str(f),
+                                        )
 
 
     # ── How to Use tab ────────────────────────────────────────────────────────
