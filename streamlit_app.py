@@ -94,13 +94,20 @@ button[data-testid="stFormSubmitButton"]:hover {
 [data-testid="collapsedControl"] path,
 [data-testid="collapsedControl"] button,
 [data-testid="collapsedControl"] button svg,
-[data-testid="collapsedControl"] button svg path {
+[data-testid="collapsedControl"] button svg path,
+[data-testid="stSidebar"] [data-testid="collapsedControl"] svg,
+button[kind="header"] svg,
+[data-testid="baseButton-header"] svg,
+[data-testid="baseButton-header"] svg path {
     fill: #FFFFFF !important;
     stroke: #FFFFFF !important;
     color: #FFFFFF !important;
 }
-[data-testid="collapsedControl"] {
+[data-testid="collapsedControl"],
+[data-testid="collapsedControl"] button,
+[data-testid="baseButton-header"] {
     background-color: #232F3E !important;
+    border-radius: 0 0 8px 0;
 }
 
 /* Sidebar */
