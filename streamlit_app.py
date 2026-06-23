@@ -118,12 +118,6 @@ button[kind="header"] svg,
 [data-testid="stSidebar"] * {
     color: #F2F2F2 !important;
 }
-/* Multiselect placeholder and input text — dark for readability */
-[data-testid="stSidebar"] [data-testid="stMultiSelect"] input,
-[data-testid="stSidebar"] [data-testid="stMultiSelect"] [data-baseweb="select"] span,
-[data-testid="stSidebar"] [data-testid="stMultiSelect"] div[class*="placeholder"] {
-    color: #111111 !important;
-}
 [data-testid="stSidebar"] .stSelectbox label,
 [data-testid="stSidebar"] .stMultiSelect label,
 [data-testid="stSidebar"] .stRadio label {
