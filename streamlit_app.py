@@ -128,12 +128,24 @@ button[kind="header"] svg,
     letter-spacing: 0.03em;
 }
 /* Multiselect dropdown arrow — navy for visibility */
-[data-testid="stSidebar"] [data-testid="stMultiSelect"] svg {
+[data-testid="stSidebar"] [data-testid="stMultiSelect"] [data-baseweb="select"] > div > div:last-child svg {
     fill: #232F3E !important;
     stroke: #232F3E !important;
     color: #232F3E !important;
     width: 20px !important;
     height: 20px !important;
+}
+/* Multiselect tag X buttons — smaller and white */
+[data-testid="stSidebar"] [data-testid="stMultiSelect"] [data-baseweb="tag"] svg {
+    fill: #FFFFFF !important;
+    stroke: #FFFFFF !important;
+    color: #FFFFFF !important;
+    width: 12px !important;
+    height: 12px !important;
+}
+[data-testid="stSidebar"] [data-testid="stMultiSelect"] [data-baseweb="tag"] [role="presentation"] {
+    width: 16px !important;
+    height: 16px !important;
 }
 
 /* Metric cards */
