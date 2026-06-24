@@ -160,54 +160,60 @@ def _generate_recommended_actions(
 
 # ── Template fallbacks (no LLM) ───────────────────────────────────────────────
 
-# Generic playbook actions per impact type — used when no API key is available.
 _TEMPLATE_ACTIONS_BY_TYPE: dict[str, list[str]] = {
     "Pricing": [
-        "Review competitive pricing on affected SKUs and consider repricing rules.",
-        "Flag affected ASINs for margin-impact review with finance.",
+        "Pull ASP data for affected brands this week vs. last 30 days — flag any SKUs where margin has dropped >5% for repricing action by EOW.",
+        "Check buy box ownership on top-20 ASINs in this category — tariff/cost pressure often triggers 3P seller exits within 2-3 weeks.",
     ],
     "Supply Chain": [
-        "Confirm inventory coverage for affected ASINs over the next 4-8 weeks.",
-        "Engage backup suppliers and assess alternate-source readiness.",
+        "Run inventory coverage report on affected brands — any SKU under 4 weeks of supply needs a PO expedite or backup supplier activated within 48 hours.",
+        "Identify top-3 alternative brands that can absorb demand if primary suppliers go OOS — pre-position these in search placements.",
     ],
     "Demand": [
-        "Increase inventory positioning on trending SKUs and review forecast assumptions.",
-        "Review search-term marketing spend on trending keywords.",
+        "Pull search volume trends for related keywords over the last 7 days — if up >20% WoW, escalate to ensure top ASINs are in-stock and ad spend is scaled.",
+        "Cross-reference trending products with current inventory depth — any top-seller under 2 weeks of cover should get emergency replenishment.",
     ],
     "Regulatory": [
-        "Audit affected listings for compliance with the new requirements.",
-        "Coordinate with legal on potential recall or relisting actions.",
+        "Identify all ASINs from the affected brand/manufacturer — run compliance check against the new requirement and flag non-compliant listings for suppression before enforcement date.",
+        "Notify affected sellers within 24 hours with specific compliance requirements and deadline — sellers who miss enforcement face listing removal.",
     ],
     "Competitive": [
-        "Monitor competitor pricing and assortment changes weekly.",
-        "Brief brand managers on the competitive event and its implications.",
+        "Map the competitor's affected product lines to our catalog — identify where their weakness creates a demand gap we can capture with targeted ads this week.",
+        "Review pricing and assortment of brands gaining share — if a competitor exits or weakens, their customers search within 48-72 hours.",
     ],
     "Seasonal": [
-        "Confirm seasonal inventory build matches the demand signal direction.",
-        "Review promotion calendar alignment with the seasonal trigger.",
+        "Validate that inventory for seasonal SKUs covers the projected demand window plus 2 weeks of buffer — late POs won't arrive in time.",
+        "Align promotional calendar with the seasonal trigger — deals launched within 72 hours of a trend spike capture 3x the traffic of delayed promotions.",
     ],
     "General": [
-        "Review affected category for direct sales implications.",
+        "Review top-10 ASINs in this category for any direct exposure to the reported event — brief account team on implications.",
     ],
 }
 
 
 def _template_executive_summary(articles: list[SummarizedArticle], category: str) -> list[str]:
-    """Build an executive summary by surfacing the top headlines, no LLM needed."""
+    """Build an executive summary extracting signal from top articles."""
     if not articles:
         return ["No relevant articles found this week."]
 
-    # Group highest-scoring article per impact type, up to 5 distinct types
+    import re
+    sorted_articles = sorted(articles, key=lambda a: a.relevance_score, reverse=True)
+
+    # Group by impact type, take the highest-scoring per type
     seen_types: set[str] = set()
     bullets: list[str] = []
-    sorted_articles = sorted(articles, key=lambda a: a.relevance_score, reverse=True)
+
     for art in sorted_articles:
         if art.impact_type in seen_types:
             continue
         seen_types.add(art.impact_type)
-        bullets.append(
-            f"**{art.impact_type}** [{art.impact_level}]: {art.title} ({art.source})"
-        )
+
+        # Build a more informative bullet using the summary (which now has extracted signal)
+        summary_short = art.summary.split(".")[0].strip() if art.summary else art.title
+        score_label = f"Score: {art.relevance_score}/100"
+        bullet = f"**{art.impact_type}** [{art.impact_level}, {score_label}]: {summary_short}. — *{art.source}*"
+        bullets.append(bullet)
+
         if len(bullets) >= 5:
             break
 
@@ -224,29 +230,32 @@ def _template_executive_summary(articles: list[SummarizedArticle], category: str
 
 
 def _template_recommended_actions(articles: list[SummarizedArticle], category: str) -> list[str]:
-    """Pick playbook actions for the impact types that fired this week."""
+    """Build recommended actions combining playbook templates with article-specific context."""
     if not articles:
         return ["No actionable items identified this week."]
 
     # Find the impact types with at least one High or Medium article, sorted by max score
-    type_max_score: dict[str, int] = {}
-    for a in articles:
-        if a.impact_level in ("High", "Medium"):
-            type_max_score[a.impact_type] = max(type_max_score.get(a.impact_type, 0), a.relevance_score)
+    type_top_article: dict[str, SummarizedArticle] = {}
+    for a in sorted(articles, key=lambda x: x.relevance_score, reverse=True):
+        if a.impact_level in ("High", "Medium") and a.impact_type not in type_top_article:
+            type_top_article[a.impact_type] = a
 
-    if not type_max_score:
-        # Fall back to whatever we have
-        for a in articles:
-            type_max_score[a.impact_type] = max(type_max_score.get(a.impact_type, 0), a.relevance_score)
+    if not type_top_article:
+        for a in sorted(articles, key=lambda x: x.relevance_score, reverse=True):
+            if a.impact_type not in type_top_article:
+                type_top_article[a.impact_type] = a
 
-    sorted_types = sorted(type_max_score.items(), key=lambda kv: kv[1], reverse=True)
+    sorted_types = sorted(type_top_article.items(), key=lambda kv: kv[1].relevance_score, reverse=True)
 
     actions: list[str] = []
-    for impact_type, _ in sorted_types:
-        for action in _TEMPLATE_ACTIONS_BY_TYPE.get(impact_type, []):
-            if len(actions) >= 5:
-                break
-            actions.append(f"[{impact_type}] {action}")
+    for impact_type, top_art in sorted_types:
+        type_actions = _TEMPLATE_ACTIONS_BY_TYPE.get(impact_type, [])
+        if type_actions:
+            # Contextualize with the triggering article
+            context = f"(Triggered by: *{top_art.title[:80]}*)"
+            actions.append(f"**{impact_type}**: {type_actions[0]} {context}")
+            if len(actions) < 5 and len(type_actions) > 1:
+                actions.append(f"**{impact_type}**: {type_actions[1]}")
         if len(actions) >= 5:
             break
 
