@@ -23,10 +23,14 @@ from src.summarizer.summarizer import group_summarized_by_impact
 logger = logging.getLogger(__name__)
 
 _REPORT_SYSTEM_PROMPT = (
-    "You are a senior Amazon category manager analyst. "
-    "You write concise, actionable intelligence reports for category managers. "
-    "Focus on Amazon marketplace implications: pricing, inventory, demand signals, and competitive dynamics. "
-    "Be specific and avoid generic platitudes. Write in professional but direct prose."
+    "You are a senior Amazon marketplace strategist who advises category leaders, CSMs, and account managers. "
+    "You write sharp, data-informed intelligence that drives decisions — not filler. "
+    "Every insight must pass the 'so what?' test: if a reader can't act on it differently than yesterday, cut it. "
+    "Quantify where possible (%, $, timeframes, market share). Name specific brands, sellers, or regulations. "
+    "Connect news events to second-order marketplace effects: ASP pressure, buy box shifts, search demand changes, "
+    "seller churn risk, catalog gaps, or competitive repositioning opportunities. "
+    "NEVER write generic advice like 'monitor the situation', 'consider restocking', or 'stay informed'. "
+    "Write like a hedge fund analyst briefing a trader, not a corporate newsletter."
 )
 
 IMPACT_ORDER = ["Supply Chain", "Pricing", "Demand", "Regulatory", "Competitive", "Seasonal", "General"]
@@ -97,8 +101,14 @@ def _generate_executive_summary(
     prompt = (
         f"Category: {category}\n\n"
         f"Top articles this week:\n{lines}\n\n"
-        "Write 3-5 executive summary bullet points for a category manager. "
-        "Each bullet should capture a distinct key theme. "
+        "Write 3-5 executive summary bullet points. Each bullet must:\n"
+        "- Lead with the strategic implication, not the headline\n"
+        "- Quantify impact where data exists (%, $, timeframe, market share)\n"
+        "- Name specific brands, companies, or regulations\n"
+        "- Pass the 'so what?' test — a reader should understand why this matters to their P&L\n\n"
+        "BAD: 'Supply chain disruptions may affect product availability'\n"
+        "GOOD: 'Foxconn plant shutdown in Zhengzhou cuts iPhone assembly capacity ~30% through Q1, "
+        "expect 2-3 week delay on accessory restocks as logistics bandwidth shifts to priority SKUs'\n\n"
         "Start each bullet with a dash (-). No headers, no numbered lists."
     )
     raw = _call_llm(client, model, 512, prompt, max_retries, base_delay)
@@ -128,9 +138,15 @@ def _generate_recommended_actions(
     prompt = (
         f"Category: {category}\n\n"
         f"Most impactful articles this week:\n{lines}\n\n"
-        "Write 3-5 specific, actionable recommendations for the Amazon category manager. "
-        "Each recommendation should reference a concrete action (e.g. adjust pricing, increase inventory, "
-        "monitor a supplier, flag a regulatory risk). "
+        "Write 3-5 specific, actionable recommendations. Each must:\n"
+        "- State a concrete action with a specific target (which ASINs, brands, or seller segments)\n"
+        "- Include a timeframe or trigger ('by EOW', 'before tariff takes effect on July 1', 'if price drops below $X')\n"
+        "- Explain the expected outcome or risk if not taken\n\n"
+        "BAD: 'Monitor supply chain and consider restocking'\n"
+        "GOOD: 'Pre-buy 4-6 weeks of [Brand] inventory before the 25% tariff hits Aug 1 — "
+        "competitors who wait will face a $3-5 ASP increase and potential stockouts in weeks 3-4'\n\n"
+        "NEVER use phrases like: 'monitor the situation', 'stay informed', 'consider adjusting', "
+        "'keep an eye on'. Every recommendation must be a decision, not a suggestion to think about it.\n\n"
         "Start each recommendation with a dash (-). No headers."
     )
     raw = _call_llm(client, model, 512, prompt, max_retries, base_delay)
