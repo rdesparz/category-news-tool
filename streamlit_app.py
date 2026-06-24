@@ -450,20 +450,6 @@ def render_full_report(report: dict) -> None:
         st.metric("Relevant", report["relevant_articles"])
 
     st.divider()
-
-    # Executive summary
-    with st.container(border=True):
-        st.markdown("### 📋 Executive Summary")
-        for bullet in report.get("executive_summary", []):
-            st.markdown(f"- {bullet}")
-
-    # Recommended actions (top of page for visibility)
-    with st.container(border=True):
-        st.markdown("### 💡 Recommended Actions")
-        for action in report.get("recommended_actions", []):
-            st.markdown(f"- {action}")
-
-    st.divider()
     st.markdown("### 🗂️ Detailed Findings")
 
     # Tabs by impact type
@@ -487,6 +473,18 @@ def render_full_report(report: dict) -> None:
                     cols[2].caption(f"**Score:** {art['relevance_score']}/100")
                     cols[3].caption(f"**Level:** {art['impact_level']}")
                     st.markdown(art["summary"])
+
+    # Executive summary & actions below findings
+    st.divider()
+    with st.container(border=True):
+        st.markdown("### 📋 Executive Summary")
+        for bullet in report.get("executive_summary", []):
+            st.markdown(f"- {bullet}")
+
+    with st.container(border=True):
+        st.markdown("### 💡 Recommended Actions")
+        for action in report.get("recommended_actions", []):
+            st.markdown(f"- {action}")
 
     # Footer
     st.divider()
