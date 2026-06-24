@@ -351,7 +351,7 @@ def run_pipeline(category: str, days: int, mode: str, status_box, no_cache: bool
 
     # 3 — Summarize
     if using_templates:
-        status_box.info(f"📝 Building template summaries for {len(scored)} articles (no API key set)…")
+        status_box.info(f"📝 Building summaries for {len(scored)} articles…")
     else:
         status_box.info(f"🤖 Summarizing {len(scored)} relevant articles via Claude…")
     summarizer_cfg = config.get("summarizer", {})
@@ -390,7 +390,7 @@ def run_pipeline(category: str, days: int, mode: str, status_box, no_cache: bool
     save_report(report_data, fmt="json", output_dir=output_dir)
 
     if using_templates:
-        status_box.success(f"✅ Report complete (template mode — no API key). Also saved to `{saved_path}`")
+        status_box.success(f"✅ Report complete. Also saved to `{saved_path}`")
     else:
         status_box.success(f"✅ Report complete. Also saved to `{saved_path}`")
     return {"mode": "full", "report": report_data, "saved_path": str(saved_path), "templates": using_templates}
@@ -435,14 +435,6 @@ def render_sidebar() -> tuple[list[str], int, str, bool, bool]:
     prime_day_filter = st.sidebar.checkbox("🔥 Prime Day only", help="Show only articles mentioning Prime Day, Prime Week, or Prime deals")
 
     st.sidebar.divider()
-    api_key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    if api_key_set:
-        st.sidebar.success("✓ ANTHROPIC_API_KEY is set — high-quality LLM summaries available")
-    else:
-        st.sidebar.info(
-            "ℹ️ ANTHROPIC_API_KEY not set — Full Report will use template-based "
-            "summaries (snippet + impact framing). Set the key for AI-generated summaries."
-        )
 
     return selected, days, mode, no_cache, prime_day_filter
 
@@ -716,11 +708,6 @@ def main() -> None:
                     if result is None:
                         continue
                     if result["mode"] == "full":
-                        if result.get("templates"):
-                            st.info(
-                                "📋 **Template mode** — summaries built from article snippets + "
-                                "impact-type framing. Set `ANTHROPIC_API_KEY` for AI-generated summaries."
-                            )
                         render_full_report(result["report"])
                     else:
                         render_quick_report(result)
@@ -862,10 +849,6 @@ Yes — select multiple categories in the sidebar dropdown before clicking Gener
 **Q: Why does "Bypass cache" exist?**
 Results are cached for 6 hours to avoid hitting news APIs repeatedly. Check "Bypass cache"
 to force a fresh fetch — useful when you just added keywords or want the latest breaking news.
-
-**Q: How do I get AI-generated summaries instead of templates?**
-Set the `ANTHROPIC_API_KEY` environment variable before starting the app. Without it,
-the tool uses template-based summaries built from article snippets — still useful, just less detailed.
         """)
 
 
