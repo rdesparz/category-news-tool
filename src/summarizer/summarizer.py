@@ -217,112 +217,35 @@ def _build_batches(
     return batches
 
 
-_PERCENT_RE = re.compile(r'\d+\.?\d*\s*%')
-_DOLLAR_RE = re.compile(r'\$[\d,]+\.?\d*\s*(?:billion|million|B|M)?', re.IGNORECASE)
-_NUMBER_RE = re.compile(r'\b\d[\d,]*\.?\d*\s*(?:billion|million|thousand|units|stores|locations)?\b', re.IGNORECASE)
-
-
-def _extract_numbers(text: str) -> list[str]:
-    """Pull out percentages, dollar amounts, and significant numbers."""
-    found = []
-    found.extend(_PERCENT_RE.findall(text))
-    found.extend(_DOLLAR_RE.findall(text))
-    if not found:
-        nums = _NUMBER_RE.findall(text)
-        found.extend(n for n in nums if any(w in n.lower() for w in ("billion", "million", "thousand", "units", "stores")))
-    return found[:3]
-
-
-def _extract_entities(text: str, brands: list[str]) -> list[str]:
-    """Find brand/company names that appear in the text."""
-    found = []
-    text_lower = text.lower()
-    for brand in brands:
-        if brand.lower() in text_lower:
-            found.append(brand)
-    return found[:4]
-
-
 def _template_summary(scored: ScoredArticle) -> str:
     """
-    Generate a non-LLM summary by extracting signal from the article text.
+    Generate a non-LLM summary using the article snippet + an impact-type lens.
 
-    Pulls out named entities, numbers, and builds a specific impact statement
-    based on what's actually in the article rather than generic framing.
+    Used when no Anthropic client is available. Concatenates the snippet
+    (truncated to 2 sentences) with a generic Amazon-impact framing chosen
+    from the article's impact type.
     """
     snippet = (scored.article.snippet or "").strip()
-    title = scored.title
-    full_text = f"{title} {snippet}"
-
-    # Extract the core event (first 2 sentences of snippet, or title)
     if snippet:
+        # Take the first two sentences of the snippet
         sentences = re.split(r'(?<=[.!?])\s+', snippet)
         what_happened = " ".join(sentences[:2]).strip()
         if not what_happened.endswith((".", "!", "?")):
             what_happened += "."
     else:
-        what_happened = title.rstrip(".!?") + "."
+        what_happened = scored.title.rstrip(".!?") + "."
 
-    # Extract quantitative data
-    numbers = _extract_numbers(full_text)
-    number_context = ""
-    if numbers:
-        number_context = f" Key figures: {', '.join(numbers[:2])}."
+    impact_framing = {
+        "Supply Chain": "May affect inventory availability and lead times for this category on Amazon.",
+        "Pricing": "May influence ASP and margin dynamics for affected products on Amazon.",
+        "Demand": "May shift consumer demand patterns and search trends within this category.",
+        "Regulatory": "May trigger compliance, listing, or recall actions on Amazon.",
+        "Competitive": "May reshape brand market share and competitive positioning in this category.",
+        "Seasonal": "May drive seasonal demand spikes or shifts in this category.",
+        "General": "May affect this category on Amazon — review for direct sales implications.",
+    }.get(scored.impact_type, "May affect this category on Amazon.")
 
-    # Build impact statement based on what's actually in the article
-    impact_signals = []
-
-    if scored.impact_type == "Supply Chain":
-        if any(w in full_text.lower() for w in ("shortage", "delay", "halt", "closure", "shut")):
-            impact_signals.append("Expect constrained supply and potential stockouts on affected SKUs")
-        elif any(w in full_text.lower() for w in ("recall", "safety")):
-            impact_signals.append("Listings may require removal or compliance updates")
-        else:
-            impact_signals.append("Supply-side disruption that could tighten inventory availability")
-
-    elif scored.impact_type == "Pricing":
-        if any(w in full_text.lower() for w in ("tariff", "duty", "import tax")):
-            impact_signals.append("Import cost increase will pressure ASPs upward across affected brands")
-        elif any(w in full_text.lower() for w in ("price war", "price cut", "discount")):
-            impact_signals.append("Downward price pressure — expect margin compression and buy box volatility")
-        else:
-            impact_signals.append("Pricing dynamics shifting — review ASP trends on affected ASINs")
-
-    elif scored.impact_type == "Demand":
-        if any(w in full_text.lower() for w in ("viral", "trending", "surge", "record")):
-            impact_signals.append("Demand spike likely — sellers without stock positioned will lose share")
-        elif any(w in full_text.lower() for w in ("decline", "slowdown", "drop")):
-            impact_signals.append("Demand softening — overexposed sellers risk excess inventory and markdowns")
-        else:
-            impact_signals.append("Consumer demand signal detected — watch search volume trends this week")
-
-    elif scored.impact_type == "Regulatory":
-        if any(w in full_text.lower() for w in ("ban", "banned", "prohibit")):
-            impact_signals.append("Product ban could force delisting — check affected ASINs immediately")
-        elif any(w in full_text.lower() for w in ("recall")):
-            impact_signals.append("Recall action may require immediate listing suppression and seller notification")
-        else:
-            impact_signals.append("Regulatory change — audit compliance of affected listings before enforcement")
-
-    elif scored.impact_type == "Competitive":
-        if any(w in full_text.lower() for w in ("bankrupt", "closing", "layoff", "restructur")):
-            impact_signals.append("Competitor weakening — opportunity to capture displaced demand and market share")
-        elif any(w in full_text.lower() for w in ("launch", "new product", "partnership")):
-            impact_signals.append("New competitive threat entering — assess overlap with top-selling ASINs")
-        else:
-            impact_signals.append("Competitive landscape shifting — review relative positioning of key brands")
-
-    elif scored.impact_type == "Seasonal":
-        if any(w in full_text.lower() for w in ("prime day", "prime week", "black friday", "holiday")):
-            impact_signals.append("Event-driven demand window — ensure inventory depth and promotional alignment")
-        else:
-            impact_signals.append("Seasonal trigger detected — validate forecast and inventory positioning")
-
-    else:
-        impact_signals.append("Review for direct category impact")
-
-    impact = impact_signals[0] if impact_signals else ""
-    return f"{what_happened}{number_context} {impact}."
+    return f"{what_happened} {impact_framing}"
 
 
 def summarize_articles(
