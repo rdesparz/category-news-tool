@@ -526,7 +526,7 @@ def render_quick_report(result: dict) -> None:
                     f"{a.impact_type}*"
                 )
 
-    st.caption("⚡ Quick scan skips LLM summarization. Switch to 'Full Report' for sales-impact summaries and recommended actions.")
+    st.caption("⚡ Rapid Scan shows scored articles by impact level. Switch to 'Categorized Report' for articles grouped by impact type with summaries and recommended actions.")
 
 
 _KEYWORD_GROUPS = ["primary", "brands", "supply_chain", "seasonal", "regulatory"]
