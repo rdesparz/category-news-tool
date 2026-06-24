@@ -423,16 +423,15 @@ def render_sidebar() -> tuple[list[str], int, str, bool, bool]:
 
     mode = st.sidebar.radio(
         "Mode",
-        options=["full", "quick"],
-        format_func=lambda x: "Full Report (LLM)" if x == "full" else "Quick Scan (no LLM)",
-        help="Quick Scan skips summarization for instant results.",
+        options=["quick", "full"],
+        format_func=lambda x: "⚡ Rapid Scan" if x == "quick" else "🔍 Deep Scan",
+        help="Rapid Scan gives instant scored results. Deep Scan adds AI-generated summaries and recommendations.",
     )
-
-    no_cache = st.sidebar.checkbox("Bypass cache", help="Force fresh fetch instead of 6-hour cache")
 
     st.sidebar.divider()
     st.sidebar.markdown("<span style='color:#FF9900; font-weight:600; font-size:0.75rem; letter-spacing:0.03em;'>FILTERS</span>", unsafe_allow_html=True)
     prime_day_filter = st.sidebar.checkbox("🔥 Prime Day only", help="Show only articles mentioning Prime Day, Prime Week, or Prime deals")
+    no_cache = st.sidebar.checkbox("🔄 Force refresh", help="Get the latest news instead of cached results (cache is 6 hours)")
 
     st.sidebar.divider()
 
