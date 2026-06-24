@@ -424,11 +424,10 @@ def render_sidebar() -> tuple[list[str], int, str, bool, bool]:
     mode = st.sidebar.radio(
         "Mode",
         options=["quick", "full"],
-        format_func=lambda x: "⚡ Rapid Scan" if x == "quick" else "🔍 Deep Scan",
-        help="Rapid Scan gives instant scored results. Deep Scan adds AI-generated summaries and recommendations.",
+        format_func=lambda x: "⚡ Rapid Scan (recommended)" if x == "quick" else "📊 Categorized Report",
+        help="Rapid Scan gives instant scored results. Categorized Report groups articles by impact type with summaries.",
     )
 
-    st.sidebar.divider()
     st.sidebar.markdown("<span style='color:#FF9900; font-weight:600; font-size:0.75rem; letter-spacing:0.03em;'>FILTERS</span>", unsafe_allow_html=True)
     prime_day_filter = st.sidebar.checkbox("🔥 Prime Day only", help="Show only articles mentioning Prime Day, Prime Week, or Prime deals")
     no_cache = st.sidebar.checkbox("🔄 Force refresh", help="Get the latest news instead of cached results (cache is 6 hours)")
@@ -758,42 +757,55 @@ def main() -> None:
         st.subheader("How to Use This Tool")
         st.markdown("""
 **Category News Intelligence** automatically scans public news sources, scores articles
-for their relevance to your Amazon product category, and generates a weekly
-intelligence report with summaries and recommended actions.
+for their relevance to your Amazon product category, and delivers an intelligence brief
+you can use in seller calls, business reviews, or category planning.
 
 ---
 
 ### Quick Start (2 minutes)
 
-1. **Select a category** from the sidebar dropdown (e.g. "Tires")
+1. **Select a category** from the sidebar dropdown (e.g. "Vitamins & Supplements")
 2. **Set the lookback period** — how many days of news to scan (7 is a good default)
 3. **Choose a mode:**
-   - **Full Report** — generates article summaries, executive summary, and recommended actions
-   - **Quick Scan** — instant results showing scored articles without summaries
-4. **Click "Generate Report"** and wait 10-30 seconds
+   - **⚡ Rapid Scan (recommended)** — instant results showing scored articles grouped by impact level. Fast, no wait.
+   - **📊 Categorized Report** — articles grouped by impact type (Supply Chain, Pricing, Demand, etc.) with summaries, executive brief, and recommended actions.
+4. **Click "Generate Report"**
 
 ---
 
-### Understanding the Report
+### Rapid Scan vs. Categorized Report
 
-| Section | What it tells you |
-|---|---|
-| **Executive Summary** | The 3-5 most important themes this week at a glance |
-| **Detailed Findings** | Each relevant article grouped by impact type, with a sales-impact summary |
-| **Recommended Actions** | Specific steps to take based on this week's news |
+| | ⚡ Rapid Scan | 📊 Categorized Report |
+|---|---|---|
+| **Speed** | Instant | 10-30 seconds |
+| **Articles** | Scored and grouped by impact level (High/Medium/Low) | Grouped by impact type (Supply Chain, Pricing, Demand, etc.) |
+| **Summaries** | Headlines + scores | Article summaries with sales-impact framing |
+| **Extras** | — | Executive Summary + Recommended Actions |
+| **Best for** | Quick pulse check, mid-week scan | Weekly briefs, sharing with team, business reviews |
 
-**Impact Levels:**
-- 🔴 **High (70-100):** Likely to directly affect pricing, availability, or demand
-- 🟡 **Medium (40-69):** Worth monitoring — may affect the category within weeks
-- 🟢 **Low (30-39):** Background signal — no immediate action needed
+---
 
-**Impact Types:**
+### Impact Levels
+
+- 🟠 **High (70-100):** Likely to directly affect pricing, availability, or demand
+- 🔶 **Medium (40-69):** Worth monitoring — may affect the category within weeks
+- 🟡 **Low (30-39):** Background signal — no immediate action needed
+
+### Impact Types
+
 - **Supply Chain** — shortages, factory closures, logistics disruptions
 - **Pricing** — tariffs, cost increases, price wars
 - **Demand** — trend shifts, viral moments, new tech adoption
 - **Regulatory** — recalls, new laws, safety mandates
 - **Competitive** — brand earnings, bankruptcies, product launches
 - **Seasonal** — weather events, holiday demand shifts
+
+---
+
+### Filters
+
+- **🔥 Prime Day only** — show only articles mentioning Prime Day, Prime Week, or Prime deals
+- **🔄 Force refresh** — get the latest news instead of cached results (cache is 6 hours)
 
 ---
 
@@ -829,8 +841,8 @@ The more specific your keywords, the better the scoring. Generic terms produce m
 
 ### Report History
 
-All generated Full Reports are automatically saved. Go to **📂 Report History** to browse
-and download past reports.
+All generated Categorized Reports are automatically saved. Go to **📂 Report History** to browse
+and download past reports as Excel files.
 
 ---
 
@@ -843,9 +855,9 @@ doesn't mention any of your terms, it won't score high. Edit the category keywor
 **Q: Can I run multiple categories at once?**
 Yes — select multiple categories in the sidebar dropdown before clicking Generate Report.
 
-**Q: Why does "Bypass cache" exist?**
-Results are cached for 6 hours to avoid hitting news APIs repeatedly. Check "Bypass cache"
-to force a fresh fetch — useful when you just added keywords or want the latest breaking news.
+**Q: What does "Force refresh" do?**
+Results are cached for 6 hours to avoid hitting news APIs repeatedly. Toggle Force refresh
+to get the latest articles — useful when you just added keywords or want breaking news.
         """)
 
 
