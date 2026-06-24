@@ -6,6 +6,8 @@ Usage:
     python -m src.fetcher.news_fetcher --category "Wireless Headphones" --limit 20
 """
 
+from __future__ import annotations
+
 import argparse
 import hashlib
 import json

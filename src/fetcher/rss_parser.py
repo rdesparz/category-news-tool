@@ -1,4 +1,5 @@
 """Google News RSS fetcher — no API key required."""
+from __future__ import annotations
 
 import logging
 import time
