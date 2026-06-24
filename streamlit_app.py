@@ -111,28 +111,26 @@ button[kind="header"] svg,
     border-radius: 0 0 8px 0;
 }
 
-/* Mobile hamburger menu styling */
-@media (max-width: 768px) {
-    [data-testid="collapsedControl"] {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        z-index: 9999 !important;
-        background-color: #232F3E !important;
-        padding: 12px !important;
-        border-radius: 0 0 8px 0 !important;
-    }
-    [data-testid="collapsedControl"] button {
-        background-color: transparent !important;
-    }
-    [data-testid="collapsedControl"] button::before {
-        content: "☰" !important;
-        font-size: 24px !important;
-        color: #FFFFFF !important;
-    }
-    [data-testid="collapsedControl"] button svg {
-        display: none !important;
-    }
+/* Mobile & desktop: hamburger icon for collapsed sidebar */
+[data-testid="collapsedControl"] button svg,
+[data-testid="collapsedControl"] button svg path {
+    display: none !important;
+}
+[data-testid="collapsedControl"] button {
+    background-color: #232F3E !important;
+    border: none !important;
+    width: 40px !important;
+    height: 40px !important;
+    position: relative !important;
+}
+[data-testid="collapsedControl"] button::after {
+    content: "☰" !important;
+    font-size: 22px !important;
+    color: #FFFFFF !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
 }
 
 /* Sidebar */
