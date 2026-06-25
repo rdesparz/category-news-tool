@@ -13,7 +13,7 @@ gnews:
 fetcher:
   days_lookback: 7
   dedup_threshold: 85   # fuzzy match score (0-100) above which articles are duplicates
-  cache_ttl_hours: 6
+  cache_ttl_hours: 2
   cache_dir: ".cache"
   request_timeout: 10
   max_retries: 3

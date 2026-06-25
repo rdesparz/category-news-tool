@@ -269,13 +269,14 @@ _BREAKING_BOOST_TERMS = {
 }
 
 
-@st.cache_data(ttl=1800, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def scan_all_categories() -> list[dict]:
     """
     Scan across major categories once and return ALL scored articles as dicts.
 
     This is the shared data source for breaking news and all homepage widgets,
-    so the page only fetches/scores once. Cached for 30 minutes.
+    so the page only fetches/scores once. Cached for 15 minutes; underlying
+    article fetch refreshes every 2 hours (see config fetcher.cache_ttl_hours).
     """
     config = load_config()
     articles: list[dict] = []
@@ -327,12 +328,21 @@ def scan_all_categories() -> list[dict]:
     return articles
 
 
-# Authoritative news sources — preferred for the featured slot.
+# Authoritative AND freely-accessible sources — preferred for the featured slot.
+# (Paywalled/bot-blocking sources are excluded here and penalized below so the
+#  featured link actually opens for users.)
 _TOP_TIER_SOURCES = {
-    "abc news", "cnbc", "reuters", "bloomberg", "the new york times", "nyt",
-    "techcrunch", "the verge", "axios", "the wall street journal", "wsj",
-    "associated press", "ap", "bbc", "cnn", "forbes", "new york post",
-    "business insider", "fortune", "the guardian", "financial times",
+    "abc news", "cnbc", "techcrunch", "the verge", "axios", "bbc", "cnn",
+    "associated press", "ap", "engadget", "the register", "9to5mac",
+    "appleinsider", "macrumors", "macdailynews", "cbc", "mashable",
+    "the guardian", "quartz", "qz.com", "zdnet", "ars technica",
+}
+# Sources that frequently serve paywalls or bot-check pages — never feature these
+# (the link often won't load for the user).
+_PAYWALL_SOURCES = {
+    "barron's", "barrons", "bloomberg", "the wall street journal", "wsj",
+    "the new york times", "nyt", "financial times", "ft.com", "the information",
+    "business insider", "forbes", "the economist", "fortune", "reuters",
 }
 # Headline patterns that signal a low-value "deals roundup" rather than real news.
 _DEALS_ROUNDUP_TERMS = (
@@ -362,7 +372,11 @@ def _featured_quality(article: dict) -> int:
     source = article["source"].lower().strip()
     q = article["effective_score"]
 
-    # Top-tier source boost (strong — we want real journalism featured)
+    # Heavy penalty for paywalled/bot-blocking sources — link often won't open
+    if any(src in source for src in _PAYWALL_SOURCES):
+        q -= 150
+
+    # Top-tier (free + reputable) source boost
     if any(src in source for src in _TOP_TIER_SOURCES):
         q += 60
 
