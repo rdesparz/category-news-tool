@@ -1033,15 +1033,18 @@ def render_sidebar() -> tuple[list[str], int, str, bool, bool, list[str]]:
     prime_day_filter = st.sidebar.checkbox("🔥 Prime Day only", help="Show only articles mentioning Prime Day, Prime Week, or Prime deals")
     no_cache = st.sidebar.checkbox("🔄 Force refresh", help="Get the latest news instead of cached results (cache is 6 hours)")
 
-    # Brand filter — options come from the brands configured for the selected categories.
+    # Brand filter — a checkbox that reveals a brand dropdown when enabled.
+    # Options come from the brands configured for the selected categories.
     brand_options = _brands_for_categories(selected)
     brand_filter: list[str] = []
     if brand_options:
-        brand_filter = st.sidebar.multiselect(
-            "🏷️ Brands",
-            options=brand_options,
-            help="Show only articles mentioning the selected brand(s). Leave empty for all.",
-        )
+        if st.sidebar.checkbox("🏷️ By brand", help="Narrow results to specific brand(s)"):
+            brand_filter = st.sidebar.multiselect(
+                "Select brands",
+                options=brand_options,
+                help="Show only articles mentioning the selected brand(s). Leave empty for all.",
+                label_visibility="collapsed",
+            )
 
     st.sidebar.divider()
 
