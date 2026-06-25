@@ -64,6 +64,21 @@ button[data-testid="stFormSubmitButton"]:hover {
     background-color: #E88B00 !important;
 }
 
+/* Full-width primary buttons (Generate Report) → big & featured */
+.stButton > button[kind="primary"][data-testid="baseButton-primary"] {
+    font-size: 1.25rem !important;
+    font-weight: 700 !important;
+    padding: 0.85rem 1rem !important;
+    box-shadow: 0 4px 14px rgba(255,153,0,0.4) !important;
+    letter-spacing: 0.02em;
+    border: 2px solid #E88B00 !important;
+    transition: all 0.15s ease !important;
+}
+.stButton > button[kind="primary"][data-testid="baseButton-primary"]:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 18px rgba(255,153,0,0.5) !important;
+}
+
 /* Secondary buttons */
 .stButton > button:not([kind="primary"]) {
     border-radius: 8px !important;
@@ -1002,27 +1017,27 @@ def main() -> None:
 
     # ── Run tab ──────────────────────────────────────────────────────────────
     with tab_run:
-        run_btn = st.button("Generate Report", type="primary", use_container_width=False)
+        run_btn = st.button("🚀 Generate Report", type="primary", use_container_width=True)
 
-        # Curated breaking news across all categories
+        # ── Report results appear here, directly under the button ──────────────
+        if run_btn and not selected_categories:
+            st.warning("👈 Select one or more categories from the sidebar first.")
+        elif run_btn:
+            for cat in selected_categories:
+                st.markdown(f"## {cat}")
+                status = st.empty()
+                result = run_pipeline(cat, days, mode, status, no_cache=no_cache, prime_day_filter=prime_day_filter)
+                status.empty()
+                if result is None:
+                    continue
+                if result["mode"] == "full":
+                    render_full_report(result["report"])
+                else:
+                    render_quick_report(result)
+                st.divider()
+
+        # ── Curated breaking news + live widgets (always shown) ────────────────
         render_breaking_news()
-
-        if not selected_categories:
-            st.info("👈 Select one or more categories from the sidebar to begin.")
-        else:
-            if run_btn:
-                for cat in selected_categories:
-                    st.markdown(f"## {cat}")
-                    status = st.empty()
-                    result = run_pipeline(cat, days, mode, status, no_cache=no_cache, prime_day_filter=prime_day_filter)
-                    status.empty()
-                    if result is None:
-                        continue
-                    if result["mode"] == "full":
-                        render_full_report(result["report"])
-                    else:
-                        render_quick_report(result)
-                    st.divider()
 
     # ── Manage tab ───────────────────────────────────────────────────────────
     with tab_manage:
