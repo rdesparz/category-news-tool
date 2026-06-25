@@ -1457,7 +1457,36 @@ you can use in seller calls, business reviews, or category planning.
 ### Filters
 
 - **🔥 Prime Day only** — show only articles mentioning Prime Day, Prime Week, or Prime deals
-- **🔄 Force refresh** — get the latest news instead of cached results (cache is 6 hours)
+- **🔄 Force refresh** — get the latest news instead of cached results
+- **🏷️ Brands** — narrow results to articles mentioning specific brands. The brand list is
+  drawn from the *Brands* keywords of whichever categories you've selected, so pick your
+  categories first, then the brands appear. Leave it empty to include all brands.
+
+---
+
+### Homepage Dashboard
+
+Even before you run a report, the **🚀 Run Report** tab shows a live dashboard that refreshes
+automatically (re-ranks every ~15 minutes, pulls fresh articles every ~2 hours):
+
+- **🔴 Breaking News** — the top stories across all major categories, with a highlighted
+  ⭐ Featured story for the biggest news of the moment
+- **📈 Prime Day Tracker** — countdown to (or days-left during) the Prime Day event, plus a
+  live count of Prime-related articles
+- **🔥 Trending Impact Types** — which kinds of news (Pricing, Supply Chain, etc.) are most
+  active, with ▲/▼ trend arrows
+- **🌡️ Category Heat Index** — categories ranked by high-impact stories. **Click any category
+  to expand its top articles right inside the widget.**
+- **📊 Category Activity** — article volume per category with trend arrows
+- **🚀 Movers** — categories with the biggest jump or drop in coverage (newest 24h vs. prior days)
+- **😀 Sentiment** — positive/negative/neutral split of the week's news, plus the single
+  biggest positive story and biggest concern
+- **📰 Top Sources** — which outlets are driving the news
+- **📉 Volume Trend** — a sparkline of total article volume over recent scans
+- **🕐 Latest Headlines** — the 5 most recent articles across all categories
+
+Use the **🏠 Home** button at the top of the Run Report tab to clear a report and return to
+the dashboard at any time.
 
 ---
 
@@ -1508,8 +1537,33 @@ doesn't mention any of your terms, it won't score high. Edit the category keywor
 Yes — select multiple categories in the sidebar dropdown before clicking Generate Report.
 
 **Q: What does "Force refresh" do?**
-Results are cached for 6 hours to avoid hitting news APIs repeatedly. Toggle Force refresh
+Results are cached to avoid hitting news APIs repeatedly. Toggle Force refresh
 to get the latest articles — useful when you just added keywords or want breaking news.
+
+**Q: Where do the brands in the Brand filter come from?**
+They're pulled from the *Brands* keyword group of the categories you've selected. To add a
+brand to the filter, add it under that category's Brands group in the **Manage Categories** tab.
+
+**Q: How often does the homepage dashboard update?**
+The widgets re-rank about every 15 minutes, and fresh articles are pulled roughly every 2 hours.
+Hit **Force refresh** in the sidebar for the absolute latest.
+
+**Q: Why is the same story featured for a while?**
+The Featured story is chosen from substantive, freely-accessible sources and refreshes on the
+dashboard's cache cycle. Paywalled or bot-blocked sources are intentionally skipped so the
+link actually opens for you.
+
+**Q: I clicked a category in the Heat Index — what happened?**
+Clicking a category in the Heat Index expands its top articles inline within that widget.
+Click it again to collapse, or use the **🏠 Home** button to reset the view.
+
+**Q: How is sentiment determined?**
+Each article is scored using a lightweight positive/negative keyword balance (e.g. "surge",
+"record" vs. "recall", "shortage"). It's a directional signal, not a precise measure.
+
+**Q: Can I download a report?**
+Yes — Categorized Reports are saved automatically. Go to **📂 Report History** to download any
+past report as an Excel (.xlsx) file with Summary and Articles sheets.
         """)
 
 
