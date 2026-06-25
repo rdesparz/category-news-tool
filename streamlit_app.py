@@ -356,7 +356,7 @@ def _article_sentiment(text: str) -> int:
     return 0
 
 
-# ── Snapshot persistence (powers trend arrows, movers, sparklines) ───────────
+# ── Snapshot persistence (powers trend arrows) ───────────────────────────────
 _SNAPSHOT_FILE = Path(".cache") / "widget_snapshots.json"
 _MAX_SNAPSHOTS = 300
 
@@ -426,20 +426,6 @@ def _previous_snapshot(history: list[dict], hours_ago: float = 24.0) -> dict | N
 
     # Not enough history yet — compare against the immediately-previous snapshot.
     return history[-2]
-
-
-_SPARK_CHARS = "▁▂▃▄▅▆▇█"
-
-
-def _sparkline(values: list[int]) -> str:
-    """Render a list of ints as a unicode sparkline."""
-    if not values:
-        return ""
-    lo, hi = min(values), max(values)
-    if hi == lo:
-        return _SPARK_CHARS[3] * len(values)
-    span = hi - lo
-    return "".join(_SPARK_CHARS[int((v - lo) / span * (len(_SPARK_CHARS) - 1))] for v in values)
 
 
 def _trend_arrow(current: int, previous: int) -> str:
@@ -803,19 +789,7 @@ def _render_widgets(articles: list[dict]) -> None:
             for src, count in src_counts.most_common(5):
                 st.markdown(f"<span style='font-size:0.82rem;'>{src} — **{count}**</span>", unsafe_allow_html=True)
 
-    # ── Row 4: Volume Trend sparkline ────────────────────────────────────────
-    if len(history) >= 3:
-        with st.container(border=True):
-            st.markdown("##### 📉 Volume Trend")
-            totals = [s["total"] for s in history[-20:]]
-            spark = _sparkline(totals)
-            st.markdown(
-                f"<span style='font-size:1.4rem; color:#FF9900; letter-spacing:2px;'>{spark}</span> "
-                f"<span style='font-size:0.8rem; color:#565959;'>total articles tracked over last {len(totals)} scans</span>",
-                unsafe_allow_html=True,
-            )
-
-    # ── Row 5: Latest Headlines Ticker ───────────────────────────────────────
+    # ── Row 4: Latest Headlines Ticker ───────────────────────────────────────
     with st.container(border=True):
         st.markdown("##### 🕐 Latest Headlines")
         recent = sorted(articles, key=lambda a: a["published_ts"], reverse=True)[:5]
@@ -1482,7 +1456,6 @@ automatically (re-ranks every ~15 minutes, pulls fresh articles every ~2 hours):
 - **😀 Sentiment** — positive/negative/neutral split of the week's news, plus the single
   biggest positive story and biggest concern
 - **📰 Top Sources** — which outlets are driving the news
-- **📉 Volume Trend** — a sparkline of total article volume over recent scans
 - **🕐 Latest Headlines** — the 5 most recent articles across all categories
 
 Use the **🏠 Home** button at the top of the Run Report tab to clear a report and return to
