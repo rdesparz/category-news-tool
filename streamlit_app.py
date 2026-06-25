@@ -153,6 +153,10 @@ button[kind="header"] svg,
 [data-testid="stSidebar"] .stRadio [role="radiogroup"] label p {
     white-space: nowrap !important;
 }
+/* Tighten checkbox spacing to match radio option spacing */
+[data-testid="stSidebar"] .stCheckbox {
+    margin-bottom: -0.5rem !important;
+}
 /* Multiselect dropdown arrow — navy for visibility */
 [data-testid="stSidebar"] [data-testid="stMultiSelect"] [data-baseweb="select"] > div > div:last-child svg {
     fill: #232F3E !important;
