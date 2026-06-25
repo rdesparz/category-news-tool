@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 import sys
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import anthropic
@@ -140,14 +140,18 @@ button[kind="header"] svg,
 [data-testid="stSidebar"] * {
     color: #F2F2F2 !important;
 }
-[data-testid="stSidebar"] .stSelectbox label,
-[data-testid="stSidebar"] .stMultiSelect label,
-[data-testid="stSidebar"] .stRadio label {
+[data-testid="stSidebar"] .stSelectbox > label,
+[data-testid="stSidebar"] .stMultiSelect > label,
+[data-testid="stSidebar"] .stRadio > label {
     color: #FF9900 !important;
     font-weight: 600 !important;
     text-transform: uppercase;
     font-size: 0.75rem !important;
     letter-spacing: 0.03em;
+}
+/* Radio option text — match filter checkbox size, keep on one line */
+[data-testid="stSidebar"] .stRadio [role="radiogroup"] label p {
+    white-space: nowrap !important;
 }
 /* Multiselect dropdown arrow — navy for visibility */
 [data-testid="stSidebar"] [data-testid="stMultiSelect"] [data-baseweb="select"] > div > div:last-child svg {
@@ -231,6 +235,246 @@ def get_anthropic_client() -> anthropic.Anthropic | None:
 
 def impact_color(level: str) -> str:
     return {"High": "🟠", "Medium": "🔶", "Low": "🟡"}.get(level, "⚪")
+
+
+# Categories most likely to surface broad, high-impact breaking news.
+_BREAKING_NEWS_CATEGORIES = [
+    "Electronics", "Wireless", "PC", "Mobile Electronics",
+    "Apparel", "Grocery", "Home", "Toys",
+]
+# Terms that signal a high-priority breaking story right now (Prime week + pricing).
+_BREAKING_BOOST_TERMS = {
+    "prime day": 25, "prime week": 25, "prime big deal": 20,
+    "price increase": 20, "raising prices": 20, "price hike": 20,
+    "tariff": 15, "raise prices": 20, "hikes price": 20,
+}
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def scan_all_categories() -> list[dict]:
+    """
+    Scan across major categories once and return ALL scored articles as dicts.
+
+    This is the shared data source for breaking news and all homepage widgets,
+    so the page only fetches/scores once. Cached for 30 minutes.
+    """
+    config = load_config()
+    articles: list[dict] = []
+    seen_urls: set[str] = set()
+
+    for category in _BREAKING_NEWS_CATEGORIES:
+        try:
+            raw_dicts = fetch_news_for_category(category, config=config, days=3, use_cache=True)
+        except Exception:
+            continue
+
+        raw_articles = [
+            Article(
+                title=d.get("title", ""),
+                source=d.get("source", ""),
+                url=d.get("url", ""),
+                published_date=d.get("published_date"),
+                snippet=d.get("snippet", ""),
+            )
+            for d in raw_dicts
+        ]
+
+        keywords = get_keywords(category, config=config)
+        threshold = config.get("scorer", {}).get("threshold", 30)
+        scored = score_articles(raw_articles, keywords, threshold=threshold)
+
+        for art in scored:
+            if art.url in seen_urls:
+                continue
+            seen_urls.add(art.url)
+
+            text = f"{art.title} {art.article.snippet}".lower()
+            boost = sum(pts for term, pts in _BREAKING_BOOST_TERMS.items() if term in text)
+
+            articles.append({
+                "title": art.title,
+                "source": art.source,
+                "url": art.url,
+                "category": category,
+                "impact_type": art.impact_type,
+                "impact_level": art.impact_level,
+                "relevance_score": art.relevance_score,
+                "effective_score": art.relevance_score + boost,
+                "published_date": art.published_date.strftime("%Y-%m-%d") if art.published_date else None,
+                "published_ts": art.published_date.timestamp() if art.published_date else 0,
+                "is_prime": any(t in text for t in ("prime day", "prime week", "prime big deal")),
+            })
+
+    return articles
+
+
+def _top_breaking(articles: list[dict], limit: int = 3) -> list[dict]:
+    """Pick top breaking stories with category diversity."""
+    ranked = sorted(articles, key=lambda a: a["effective_score"], reverse=True)
+    picked: list[dict] = []
+    used: set[str] = set()
+    for item in ranked:
+        if item["category"] not in used:
+            picked.append(item)
+            used.add(item["category"])
+        if len(picked) >= limit:
+            break
+    if len(picked) < limit:
+        picked_urls = {p["url"] for p in picked}
+        for item in ranked:
+            if item["url"] not in picked_urls:
+                picked.append(item)
+            if len(picked) >= limit:
+                break
+    return picked[:limit]
+
+
+def render_breaking_news() -> None:
+    """Render the curated breaking news banner + live widgets at the top of the Run tab."""
+    with st.spinner("Loading breaking news…"):
+        try:
+            articles = scan_all_categories()
+        except Exception:
+            articles = []
+
+    if not articles:
+        return
+
+    stories = _top_breaking(articles, limit=3)
+
+    # ── Breaking News banner ──────────────────────────────────────────────
+    st.markdown(
+        "<div style='background:#232F3E; padding:10px 16px; border-radius:8px 8px 0 0; margin-bottom:0;'>"
+        "<span style='color:#FF9900; font-weight:700; font-size:1rem;'>🔴 BREAKING NEWS</span>"
+        "<span style='color:#D5D9D9; font-size:0.8rem; margin-left:10px;'>Top stories across all categories · last 3 days</span>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # Pick the featured story: highest-scoring (already first after diversity sort).
+    featured = stories[0] if stories else None
+    rest = stories[1:] if len(stories) > 1 else []
+
+    if featured:
+        prime_badge = "🔥 PRIME " if featured.get("is_prime") else ""
+        badge = impact_color(featured["impact_level"])
+        st.markdown(
+            f"""<div style='border:3px solid #FF9900; border-radius:0 0 8px 8px; background:#FFF8EE;
+                 padding:16px 20px; margin-bottom:14px; box-shadow:0 2px 8px rgba(255,153,0,0.25);'>
+                <span style='background:#E01E2B; color:#FFF; font-size:0.72rem; font-weight:800;
+                      padding:3px 10px; border-radius:10px; letter-spacing:0.04em;'>⭐ FEATURED</span>
+                <span style='background:#FF9900; color:#111; font-size:0.72rem; font-weight:700;
+                      padding:3px 10px; border-radius:10px; margin-left:6px;'>{prime_badge}{featured['category']}</span>
+                <div style='font-size:1.15rem; font-weight:700; margin-top:10px; line-height:1.35;'>
+                    {badge} <a href='{featured['url']}' style='color:#232F3E !important; text-decoration:none;'>{featured['title']}</a>
+                </div>
+                <div style='font-size:0.82rem; color:#565959; margin-top:6px;'>
+                    {featured['source']} · {featured.get('published_date') or 'recent'} ·
+                    {featured['impact_type']} · Score {featured['relevance_score']}/100
+                </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+    if rest:
+        cols = st.columns(len(rest))
+        for col, story in zip(cols, rest):
+            with col:
+                with st.container(border=True):
+                    prime_badge = "🔥 PRIME " if story.get("is_prime") else ""
+                    badge = impact_color(story["impact_level"])
+                    st.markdown(
+                        f"<span style='background:#FF9900; color:#111; font-size:0.7rem; font-weight:700; "
+                        f"padding:2px 8px; border-radius:10px;'>{prime_badge}{story['category']}</span>",
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(f"**{badge} [{story['title']}]({story['url']})**")
+                    st.caption(
+                        f"{story['source']} · {story.get('published_date') or 'recent'} · "
+                        f"{story['impact_type']} · Score {story['relevance_score']}/100"
+                    )
+
+    # ── Live widgets ──────────────────────────────────────────────────────
+    _render_widgets(articles)
+    st.divider()
+
+
+# Prime Day 2026 event window (multi-day event)
+_PRIME_DAY_START = date(2026, 6, 23)
+_PRIME_DAY_END = date(2026, 6, 26)
+
+
+def _render_widgets(articles: list[dict]) -> None:
+    """Render the five live homepage widgets from the shared article scan."""
+    from collections import Counter
+
+    # Row 1: Prime Day countdown + Trending impact types
+    c1, c2 = st.columns(2)
+
+    with c1:
+        with st.container(border=True):
+            st.markdown("##### 📈 Prime Day Tracker")
+            today = date.today()
+            prime_count = sum(1 for a in articles if a["is_prime"])
+            window = f"{_PRIME_DAY_START:%b %d}–{_PRIME_DAY_END:%b %d, %Y}"
+            if today < _PRIME_DAY_START:
+                st.metric("Days until Prime Day", (_PRIME_DAY_START - today).days, help=f"Prime Day: {window}")
+            elif _PRIME_DAY_START <= today <= _PRIME_DAY_END:
+                days_left = (_PRIME_DAY_END - today).days
+                st.metric("🎉 Prime Day is LIVE", f"{days_left} day{'s' if days_left != 1 else ''} left", help=window)
+            else:
+                st.metric("Days since Prime Day", (today - _PRIME_DAY_END).days)
+            st.caption(f"🔥 {prime_count} Prime-related articles in the last 3 days")
+
+    with c2:
+        with st.container(border=True):
+            st.markdown("##### 🔥 Trending Impact Types")
+            type_counts = Counter(a["impact_type"] for a in articles)
+            for itype, count in type_counts.most_common(4):
+                st.markdown(f"**{itype}** — {count} stories")
+
+    # Row 2: Category Heat Index + Category Activity Meter
+    c3, c4 = st.columns(2)
+
+    with c3:
+        with st.container(border=True):
+            st.markdown("##### 🌡️ Category Heat Index")
+            st.caption("Top categories by high-impact stories")
+            heat = Counter(
+                a["category"] for a in articles if a["impact_level"] == "High"
+            )
+            if not heat:
+                heat = Counter(a["category"] for a in articles)
+            for cat, count in heat.most_common(5):
+                st.markdown(f"🔴 **{cat}** — {count}")
+
+    with c4:
+        with st.container(border=True):
+            st.markdown("##### 📊 Category Activity")
+            st.caption("Article volume by category")
+            activity = Counter(a["category"] for a in articles)
+            if activity:
+                max_count = max(activity.values())
+                for cat, count in activity.most_common(6):
+                    pct = int((count / max_count) * 100)
+                    bar = "█" * max(1, int(pct / 10))
+                    st.markdown(
+                        f"<span style='font-size:0.8rem;'>{cat}</span> "
+                        f"<span style='color:#FF9900;'>{bar}</span> "
+                        f"<span style='font-size:0.75rem; color:#565959;'>{count}</span>",
+                        unsafe_allow_html=True,
+                    )
+
+    # Row 3: Latest Headlines Ticker
+    with st.container(border=True):
+        st.markdown("##### 🕐 Latest Headlines")
+        recent = sorted(articles, key=lambda a: a["published_ts"], reverse=True)[:5]
+        for a in recent:
+            st.markdown(
+                f"<span style='font-size:0.85rem;'>🔹 [{a['title']}]({a['url']}) "
+                f"<span style='color:#565959;'>· {a['category']} · {a.get('published_date') or 'recent'}</span></span>",
+                unsafe_allow_html=True,
+            )
 
 
 def _report_to_excel(file_path: Path) -> bytes | None:
@@ -691,10 +935,14 @@ def main() -> None:
 
     # ── Run tab ──────────────────────────────────────────────────────────────
     with tab_run:
+        run_btn = st.button("Generate Report", type="primary", use_container_width=False)
+
+        # Curated breaking news across all categories
+        render_breaking_news()
+
         if not selected_categories:
             st.info("👈 Select one or more categories from the sidebar to begin.")
         else:
-            run_btn = st.button("Generate Report", type="primary", use_container_width=False)
             if run_btn:
                 for cat in selected_categories:
                     st.markdown(f"## {cat}")
