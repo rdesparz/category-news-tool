@@ -20,7 +20,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).parent))
 
 from src.fetcher.news_fetcher import fetch_news_for_category
-from src.keywords.category_keywords import get_keywords
+from src.keywords.category_keywords import get_keywords, load_category_config
 from src.models.article import Article
 from src.registry.categories import list_configured_categories
 from src.report.report_generator import build_report_data, save_report
@@ -901,7 +901,14 @@ def _is_prime_day_article(article) -> bool:
     return any(term in text for term in _PRIME_DAY_TERMS)
 
 
-def run_pipeline(category: str, days: int, mode: str, status_box, no_cache: bool = False, prime_day_filter: bool = False) -> dict | None:
+def _mentions_any_brand(article, brands: list[str]) -> bool:
+    """Check if an article mentions any of the given brand names."""
+    text = f"{article.title} {getattr(article, 'snippet', '')}".lower()
+    return any(b.lower() in text for b in brands)
+
+
+def run_pipeline(category: str, days: int, mode: str, status_box, no_cache: bool = False,
+                 prime_day_filter: bool = False, brand_filter: list[str] | None = None) -> dict | None:
     """Run the full pipeline; mode is 'full' or 'quick'."""
     config = load_config()
 
@@ -923,6 +930,11 @@ def run_pipeline(category: str, days: int, mode: str, status_box, no_cache: bool
     if prime_day_filter:
         raw_articles = [a for a in raw_articles if _is_prime_day_article(a)]
         status_box.info(f"🔥 Prime Day filter: {len(raw_articles)} articles mention Prime Day")
+
+    # Apply brand filter if any brands selected
+    if brand_filter:
+        raw_articles = [a for a in raw_articles if _mentions_any_brand(a, brand_filter)]
+        status_box.info(f"🏷️ Brand filter ({', '.join(brand_filter)}): {len(raw_articles)} matching articles")
 
     # 2 — Score
     status_box.info(f"🎯 Scoring {len(raw_articles)} articles for relevance…")
@@ -992,7 +1004,20 @@ def run_pipeline(category: str, days: int, mode: str, status_box, no_cache: bool
 
 # ── UI Components ─────────────────────────────────────────────────────────────
 
-def render_sidebar() -> tuple[list[str], int, str, bool, bool]:
+def _brands_for_categories(categories: list[str]) -> list[str]:
+    """Collect the union of brand keywords across the selected categories."""
+    brands: list[str] = []
+    seen = set()
+    for cat in categories:
+        kw = load_category_config(cat, CATEGORY_DIR) or {}
+        for b in kw.get("brands", []):
+            if b not in seen:
+                seen.add(b)
+                brands.append(b)
+    return sorted(brands)
+
+
+def render_sidebar() -> tuple[list[str], int, str, bool, bool, list[str]]:
     logo = _logo_b64()
     st.sidebar.markdown(f"""
     <div style="text-align:center; padding:10px 0 15px;">
@@ -1034,9 +1059,19 @@ def render_sidebar() -> tuple[list[str], int, str, bool, bool]:
     prime_day_filter = st.sidebar.checkbox("🔥 Prime Day only", help="Show only articles mentioning Prime Day, Prime Week, or Prime deals")
     no_cache = st.sidebar.checkbox("🔄 Force refresh", help="Get the latest news instead of cached results (cache is 6 hours)")
 
+    # Brand filter — options come from the brands configured for the selected categories.
+    brand_options = _brands_for_categories(selected)
+    brand_filter: list[str] = []
+    if brand_options:
+        brand_filter = st.sidebar.multiselect(
+            "🏷️ Brands",
+            options=brand_options,
+            help="Show only articles mentioning the selected brand(s). Leave empty for all.",
+        )
+
     st.sidebar.divider()
 
-    return selected, days, mode, no_cache, prime_day_filter
+    return selected, days, mode, no_cache, prime_day_filter, brand_filter
 
 
 def render_full_report(report: dict) -> None:
@@ -1287,7 +1322,7 @@ def main() -> None:
     """, unsafe_allow_html=True)
     st.markdown("")
 
-    selected_categories, days, mode, no_cache, prime_day_filter = render_sidebar()
+    selected_categories, days, mode, no_cache, prime_day_filter, brand_filter = render_sidebar()
 
     tab_run, tab_manage, tab_history, tab_help = st.tabs(["🚀 Run Report", "⚙️ Manage Categories", "📂 Report History", "❓ How to Use"])
 
@@ -1313,7 +1348,7 @@ def main() -> None:
             for cat in selected_categories:
                 st.markdown(f"## {cat}")
                 status = st.empty()
-                result = run_pipeline(cat, days, mode, status, no_cache=no_cache, prime_day_filter=prime_day_filter)
+                result = run_pipeline(cat, days, mode, status, no_cache=no_cache, prime_day_filter=prime_day_filter, brand_filter=brand_filter)
                 status.empty()
                 if result is None:
                     continue
