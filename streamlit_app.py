@@ -1146,6 +1146,16 @@ def render_quick_report(result: dict) -> None:
 _KEYWORD_GROUPS = ["primary", "brands", "supply_chain", "seasonal", "regulatory"]
 
 
+def _editing_enabled() -> bool:
+    """
+    Category editing (add/edit/delete) is only allowed when CATEGORY_EDIT_ENABLED
+    is set — present in the local dev environment, absent on production (Streamlit
+    Cloud). This keeps the public app view-only so categories can't be changed or
+    deleted by anyone, and stops edits that would silently revert on reboot.
+    """
+    return os.environ.get("CATEGORY_EDIT_ENABLED", "").strip().lower() in ("1", "true", "yes")
+
+
 def _render_edit_form(cat: str, slug: str, yaml_path: Path, data: dict, kw: dict) -> None:
     """Render an editable form for an existing category."""
     with st.form(f"edit_form_{slug}"):
@@ -1198,8 +1208,24 @@ def _render_edit_form(cat: str, slug: str, yaml_path: Path, data: dict, kw: dict
                 st.error(f"Failed to save: {exc}")
 
 
+def _render_readonly_category(cat: str, kw: dict) -> None:
+    """Show a category's keyword groups without any editing controls."""
+    for group in _KEYWORD_GROUPS:
+        terms = kw.get(group, [])
+        if terms:
+            st.markdown(f"**{group.replace('_', ' ').title()}:** {', '.join(terms)}")
+
+
 def render_manage_categories_tab() -> None:
+    can_edit = _editing_enabled()
+
     st.subheader("Registered Categories")
+    if not can_edit:
+        st.info(
+            "🔒 Categories are **view-only** here. Editing is disabled on the live app "
+            "to keep the category list stable for everyone. Changes are made in the "
+            "development environment and deployed by the app owner."
+        )
 
     cats = list_configured_categories(CATEGORY_DIR)
     if cats:
@@ -1214,6 +1240,10 @@ def render_manage_categories_tab() -> None:
             kw = data.get("keywords", {})
 
             with st.expander(cat):
+                if not can_edit:
+                    _render_readonly_category(cat, kw)
+                    continue
+
                 _render_edit_form(cat, slug, yaml_path, data, kw)
 
                 st.divider()
@@ -1239,6 +1269,9 @@ def render_manage_categories_tab() -> None:
                         st.rerun()
     else:
         st.info("No categories registered yet.")
+
+    if not can_edit:
+        return
 
     st.divider()
     st.subheader("➕ Add New Category")
