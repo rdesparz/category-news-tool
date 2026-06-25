@@ -323,7 +323,16 @@ _TOP_TIER_SOURCES = {
 _DEALS_ROUNDUP_TERMS = (
     "best deals", "best sales", "deals rival", "save on", "discount",
     "get the", "% off", "last chance", "best prime day", "top deals",
-    "deals we found", "shop the", "before apple raises",
+    "deals we found", "shop the", "before apple raises", "prime day deals",
+    "deals even better", "deals include", "$ off", "off for prime",
+    "off the", "discounted", "grab the", "snag the", "deal of the",
+)
+# Strong "this is real news reporting" signals for the featured slot.
+_HARD_NEWS_TERMS = (
+    "price hike", "price increase", "raises price", "hikes price",
+    "raises prices", "go into effect", "price hikes", "more expensive",
+    "announces price", "shares slide", "stock drops", "stock falls",
+    "passes", "costs to consumers", "amid", "due to",
 )
 
 
@@ -331,25 +340,24 @@ def _featured_quality(article: dict) -> int:
     """
     Score how well-suited an article is for the FEATURED hero slot.
 
-    Rewards authoritative sources and substantive price/news language;
-    penalizes 'deals roundup' style headlines that aren't real reporting.
+    Strongly rewards authoritative sources + real news reporting;
+    heavily penalizes 'deals roundup' headlines so they never feature.
     """
     title = article["title"].lower()
     source = article["source"].lower().strip()
     q = article["effective_score"]
 
-    # Top-tier source boost
+    # Top-tier source boost (strong — we want real journalism featured)
     if any(src in source for src in _TOP_TIER_SOURCES):
+        q += 60
+
+    # Substantive news-reporting language
+    if any(w in title for w in _HARD_NEWS_TERMS):
         q += 30
 
-    # Substantive price-news language
-    if any(w in title for w in ("price hike", "price increase", "raises price", "hikes price",
-                                 "raises prices", "go into effect", "price hikes", "more expensive")):
-        q += 20
-
-    # Penalize deals-roundup headlines
+    # Heavy penalty for deals-roundup framing — these should never be featured
     if any(term in title for term in _DEALS_ROUNDUP_TERMS):
-        q -= 40
+        q -= 100
 
     return q
 
