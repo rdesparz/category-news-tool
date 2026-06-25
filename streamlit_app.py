@@ -312,24 +312,79 @@ def scan_all_categories() -> list[dict]:
     return articles
 
 
+# Authoritative news sources — preferred for the featured slot.
+_TOP_TIER_SOURCES = {
+    "abc news", "cnbc", "reuters", "bloomberg", "the new york times", "nyt",
+    "techcrunch", "the verge", "axios", "the wall street journal", "wsj",
+    "associated press", "ap", "bbc", "cnn", "forbes", "new york post",
+    "business insider", "fortune", "the guardian", "financial times",
+}
+# Headline patterns that signal a low-value "deals roundup" rather than real news.
+_DEALS_ROUNDUP_TERMS = (
+    "best deals", "best sales", "deals rival", "save on", "discount",
+    "get the", "% off", "last chance", "best prime day", "top deals",
+    "deals we found", "shop the", "before apple raises",
+)
+
+
+def _featured_quality(article: dict) -> int:
+    """
+    Score how well-suited an article is for the FEATURED hero slot.
+
+    Rewards authoritative sources and substantive price/news language;
+    penalizes 'deals roundup' style headlines that aren't real reporting.
+    """
+    title = article["title"].lower()
+    source = article["source"].lower().strip()
+    q = article["effective_score"]
+
+    # Top-tier source boost
+    if any(src in source for src in _TOP_TIER_SOURCES):
+        q += 30
+
+    # Substantive price-news language
+    if any(w in title for w in ("price hike", "price increase", "raises price", "hikes price",
+                                 "raises prices", "go into effect", "price hikes", "more expensive")):
+        q += 20
+
+    # Penalize deals-roundup headlines
+    if any(term in title for term in _DEALS_ROUNDUP_TERMS):
+        q -= 40
+
+    return q
+
+
 def _top_breaking(articles: list[dict], limit: int = 3) -> list[dict]:
-    """Pick top breaking stories with category diversity."""
+    """Pick the best-quality story for the hero slot, then fill with category diversity."""
+    if not articles:
+        return []
+
+    # Featured story: highest featured-quality article overall (substantive source + news language).
+    featured = max(articles, key=_featured_quality)
+    picked: list[dict] = [featured]
+    used: set[str] = {featured["category"]}
+    picked_urls: set[str] = {featured["url"]}
+
+    # Fill remaining slots by effective score, preferring new categories.
     ranked = sorted(articles, key=lambda a: a["effective_score"], reverse=True)
-    picked: list[dict] = []
-    used: set[str] = set()
     for item in ranked:
-        if item["category"] not in used:
-            picked.append(item)
-            used.add(item["category"])
         if len(picked) >= limit:
             break
+        if item["url"] in picked_urls or item["category"] in used:
+            continue
+        picked.append(item)
+        used.add(item["category"])
+        picked_urls.add(item["url"])
+
+    # Backfill if still short (fewer distinct categories than limit).
     if len(picked) < limit:
-        picked_urls = {p["url"] for p in picked}
         for item in ranked:
-            if item["url"] not in picked_urls:
-                picked.append(item)
             if len(picked) >= limit:
                 break
+            if item["url"] not in picked_urls:
+                picked.append(item)
+                picked_urls.add(item["url"])
+
     return picked[:limit]
 
 
