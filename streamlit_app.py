@@ -7,6 +7,7 @@ Run:
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from datetime import date, datetime
@@ -323,9 +324,132 @@ def scan_all_categories() -> list[dict]:
                 "published_date": art.published_date.strftime("%Y-%m-%d") if art.published_date else None,
                 "published_ts": art.published_date.timestamp() if art.published_date else 0,
                 "is_prime": any(t in text for t in ("prime day", "prime week", "prime big deal")),
+                "sentiment": _article_sentiment(text),
             })
 
+    _record_snapshot(articles)
     return articles
+
+
+# ── Sentiment scoring (lightweight, no LLM) ──────────────────────────────────
+_POSITIVE_TERMS = (
+    "surge", "growth", "record", "boom", "soar", "rally", "win", "wins",
+    "launch", "popular", "demand", "rebound", "gain", "gains", "best",
+    "upgrade", "expansion", "milestone", "strong", "rise", "rises",
+)
+_NEGATIVE_TERMS = (
+    "recall", "shortage", "lawsuit", "ban", "banned", "decline", "drop",
+    "drops", "crash", "bankrupt", "layoff", "tariff", "hike", "hikes",
+    "expensive", "disruption", "delay", "shutdown", "slump", "fall",
+    "falls", "warning", "fine", "penalty", "slide", "cut", "cuts",
+)
+
+
+def _article_sentiment(text: str) -> int:
+    """Return +1 (positive), -1 (negative), or 0 (neutral) from keyword balance."""
+    pos = sum(1 for t in _POSITIVE_TERMS if t in text)
+    neg = sum(1 for t in _NEGATIVE_TERMS if t in text)
+    if pos > neg:
+        return 1
+    if neg > pos:
+        return -1
+    return 0
+
+
+# ── Snapshot persistence (powers trend arrows, movers, sparklines) ───────────
+_SNAPSHOT_FILE = Path(".cache") / "widget_snapshots.json"
+_MAX_SNAPSHOTS = 300
+
+
+def _record_snapshot(articles: list[dict]) -> None:
+    """Append a lightweight count snapshot so widgets can show change over time."""
+    from collections import Counter
+    try:
+        now = datetime.now(tz=None)
+        cat_counts = Counter(a["category"] for a in articles)
+        high_counts = Counter(a["category"] for a in articles if a["impact_level"] == "High")
+        type_counts = Counter(a["impact_type"] for a in articles)
+
+        snapshot = {
+            "ts": now.isoformat(),
+            "day": now.strftime("%Y-%m-%d"),
+            "total": len(articles),
+            "cat_counts": dict(cat_counts),
+            "high_counts": dict(high_counts),
+            "type_counts": dict(type_counts),
+        }
+
+        history = _load_snapshots()
+        # Avoid duplicate snapshots within the same 5-minute window
+        if history:
+            last_ts = datetime.fromisoformat(history[-1]["ts"])
+            if (now - last_ts).total_seconds() < 300:
+                return
+        history.append(snapshot)
+        history = history[-_MAX_SNAPSHOTS:]
+
+        _SNAPSHOT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(_SNAPSHOT_FILE, "w") as f:
+            json.dump(history, f)
+    except Exception:
+        pass  # Snapshots are best-effort; never break the page
+
+
+def _load_snapshots() -> list[dict]:
+    """Load the snapshot history (oldest first)."""
+    if not _SNAPSHOT_FILE.exists():
+        return []
+    try:
+        with open(_SNAPSHOT_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+def _previous_snapshot(history: list[dict], hours_ago: float = 24.0) -> dict | None:
+    """
+    Return a baseline snapshot to compare against.
+
+    Prefers the snapshot closest to `hours_ago` before the latest; if none is
+    that old yet, falls back to the immediately-previous snapshot so Movers and
+    trend arrows populate as soon as a second snapshot exists.
+    """
+    if len(history) < 2:
+        return None
+    latest_ts = datetime.fromisoformat(history[-1]["ts"])
+    target = latest_ts.timestamp() - hours_ago * 3600
+
+    # Best snapshot at or before the target time.
+    aged = [s for s in history[:-1] if datetime.fromisoformat(s["ts"]).timestamp() <= target]
+    if aged:
+        return aged[-1]
+
+    # Not enough history yet — compare against the immediately-previous snapshot.
+    return history[-2]
+
+
+_SPARK_CHARS = "▁▂▃▄▅▆▇█"
+
+
+def _sparkline(values: list[int]) -> str:
+    """Render a list of ints as a unicode sparkline."""
+    if not values:
+        return ""
+    lo, hi = min(values), max(values)
+    if hi == lo:
+        return _SPARK_CHARS[3] * len(values)
+    span = hi - lo
+    return "".join(_SPARK_CHARS[int((v - lo) / span * (len(_SPARK_CHARS) - 1))] for v in values)
+
+
+def _trend_arrow(current: int, previous: int) -> str:
+    """Return a colored arrow + delta comparing current vs previous count."""
+    delta = current - previous
+    if delta > 0:
+        return f"<span style='color:#067D62;'>▲ {delta}</span>"
+    if delta < 0:
+        return f"<span style='color:#C7511F;'>▼ {abs(delta)}</span>"
+    return "<span style='color:#888;'>▬</span>"
 
 
 # Authoritative AND freely-accessible sources — preferred for the featured slot.
@@ -500,15 +624,43 @@ _PRIME_DAY_START = date(2026, 6, 23)
 _PRIME_DAY_END = date(2026, 6, 26)
 
 
+def _heat_dot(count: int, max_count: int) -> str:
+    """Color-coded dot scaled to volume."""
+    if max_count <= 0:
+        return "⚪"
+    ratio = count / max_count
+    if ratio >= 0.66:
+        return "🔴"
+    if ratio >= 0.33:
+        return "🟠"
+    return "🟡"
+
+
+# Fixed height (px) so all widget cards line up uniformly on desktop.
+_WIDGET_HEIGHT = 290
+
+
 def _render_widgets(articles: list[dict]) -> None:
-    """Render the five live homepage widgets from the shared article scan."""
+    """Render the live homepage widgets from the shared article scan."""
     from collections import Counter
 
-    # Row 1: Prime Day countdown + Trending impact types
+    history = _load_snapshots()
+    prev = _previous_snapshot(history, hours_ago=24.0)
+    prev_cat = Counter(prev["cat_counts"]) if prev else Counter()
+    prev_type = Counter(prev["type_counts"]) if prev else Counter()
+
+    cat_counts = Counter(a["category"] for a in articles)
+    high_counts = Counter(a["category"] for a in articles if a["impact_level"] == "High")
+    type_counts = Counter(a["impact_type"] for a in articles)
+
+    # "Last updated" line
+    st.caption(f"🕒 Last updated: {datetime.now():%b %d, %I:%M %p} · 💡 click a category in the Heat Index to view its articles")
+
+    # ── Row 1: Prime Day Tracker + Trending Impact Types (with trend arrows) ──
     c1, c2 = st.columns(2)
 
     with c1:
-        with st.container(border=True):
+        with st.container(border=True, height=_WIDGET_HEIGHT):
             st.markdown("##### 📈 Prime Day Tracker")
             today = date.today()
             prime_count = sum(1 for a in articles if a["is_prime"])
@@ -523,45 +675,147 @@ def _render_widgets(articles: list[dict]) -> None:
             st.caption(f"🔥 {prime_count} Prime-related articles in the last 3 days")
 
     with c2:
-        with st.container(border=True):
+        with st.container(border=True, height=_WIDGET_HEIGHT):
             st.markdown("##### 🔥 Trending Impact Types")
-            type_counts = Counter(a["impact_type"] for a in articles)
+            st.caption("vs. ~24h ago")
             for itype, count in type_counts.most_common(4):
-                st.markdown(f"**{itype}** — {count} stories")
+                arrow = _trend_arrow(count, prev_type.get(itype, count))
+                st.markdown(f"**{itype}** — {count} {arrow}", unsafe_allow_html=True)
 
-    # Row 2: Category Heat Index + Category Activity Meter
+    # ── Row 2: Category Heat Index (clickable) + Category Activity (clickable) ──
     c3, c4 = st.columns(2)
 
     with c3:
-        with st.container(border=True):
+        with st.container(border=True, height=_WIDGET_HEIGHT):
             st.markdown("##### 🌡️ Category Heat Index")
-            st.caption("Top categories by high-impact stories")
-            heat = Counter(
-                a["category"] for a in articles if a["impact_level"] == "High"
-            )
-            if not heat:
-                heat = Counter(a["category"] for a in articles)
+            st.caption("High-impact stories · click to view articles")
+            heat = high_counts if high_counts else cat_counts
+            heat_max = max(heat.values()) if heat else 0
+            expanded = st.session_state.get("heat_expanded")
             for cat, count in heat.most_common(5):
-                st.markdown(f"🔴 **{cat}** — {count}")
+                dot = _heat_dot(count, heat_max)
+                is_open = expanded == cat
+                if st.button(
+                    f"{dot} {cat} — {count} {'▾' if is_open else '▸'}",
+                    key=f"heat_{cat}",
+                    use_container_width=True,
+                ):
+                    # Toggle this category open/closed, then rerun.
+                    st.session_state["heat_expanded"] = None if is_open else cat
+                    st.rerun()
+
+                # Inline article dropdown for the expanded category
+                if is_open:
+                    cat_articles = sorted(
+                        [a for a in articles if a["category"] == cat],
+                        key=lambda a: a["relevance_score"], reverse=True,
+                    )[:5]
+                    if cat_articles:
+                        for a in cat_articles:
+                            badge = impact_color(a["impact_level"])
+                            st.markdown(
+                                f"<div style='font-size:0.8rem; padding:2px 0 6px 8px; border-left:2px solid #FF9900; margin:2px 0 6px 4px;'>"
+                                f"{badge} <a href='{a['url']}'>{a['title']}</a><br>"
+                                f"<span style='color:#565959; font-size:0.72rem;'>{a['source']} · {a['impact_type']} · Score {a['relevance_score']}/100</span>"
+                                f"</div>",
+                                unsafe_allow_html=True,
+                            )
+                    else:
+                        st.caption("No articles found.")
 
     with c4:
-        with st.container(border=True):
+        with st.container(border=True, height=_WIDGET_HEIGHT):
             st.markdown("##### 📊 Category Activity")
-            st.caption("Article volume by category")
-            activity = Counter(a["category"] for a in articles)
-            if activity:
-                max_count = max(activity.values())
-                for cat, count in activity.most_common(6):
-                    pct = int((count / max_count) * 100)
-                    bar = "█" * max(1, int(pct / 10))
+            st.caption("Volume · ▲▼ vs ~24h ago")
+            if cat_counts:
+                max_count = max(cat_counts.values())
+                for cat, count in cat_counts.most_common(6):
+                    bar = "█" * max(1, int((count / max_count) * 10))
+                    arrow = _trend_arrow(count, prev_cat.get(cat, count))
                     st.markdown(
                         f"<span style='font-size:0.8rem;'>{cat}</span> "
                         f"<span style='color:#FF9900;'>{bar}</span> "
-                        f"<span style='font-size:0.75rem; color:#565959;'>{count}</span>",
+                        f"<span style='font-size:0.75rem; color:#565959;'>{count}</span> {arrow}",
                         unsafe_allow_html=True,
                     )
 
-    # Row 3: Latest Headlines Ticker
+    # ── Row 3: Movers + Sentiment + Top Sources ──────────────────────────────
+    c5, c6, c7 = st.columns(3)
+
+    with c5:
+        with st.container(border=True, height=_WIDGET_HEIGHT):
+            st.markdown("##### 🚀 Movers")
+            st.caption("Newest 24h vs. prior days")
+            # Compute momentum from the current scan: recent (last 24h) vs older
+            # articles per category. Always populates — no persisted history needed.
+            now_ts = datetime.now().timestamp()
+            recent_cut = now_ts - 24 * 3600
+            recent = Counter(a["category"] for a in articles if a["published_ts"] >= recent_cut)
+            older = Counter(a["category"] for a in articles if 0 < a["published_ts"] < recent_cut)
+            deltas = []
+            for cat in set(recent) | set(older):
+                d = recent.get(cat, 0) - older.get(cat, 0)
+                if d != 0:
+                    deltas.append((cat, d))
+            deltas.sort(key=lambda x: abs(x[1]), reverse=True)
+            if deltas:
+                for cat, d in deltas[:5]:
+                    sign = f"<span style='color:#067D62;'>▲ +{d}</span>" if d > 0 else f"<span style='color:#C7511F;'>▼ {abs(d)}</span>"
+                    st.markdown(f"<span style='font-size:0.82rem;'>{cat}</span> {sign}", unsafe_allow_html=True)
+            else:
+                st.caption("Steady — no notable movement")
+
+    with c6:
+        with st.container(border=True, height=_WIDGET_HEIGHT):
+            st.markdown("##### 😀 Sentiment")
+            pos_arts = [a for a in articles if a["sentiment"] > 0]
+            neg_arts = [a for a in articles if a["sentiment"] < 0]
+            total = max(1, len(articles))
+            neu = len(articles) - len(pos_arts) - len(neg_arts)
+            st.markdown(
+                f"<div style='font-size:0.8rem;'>"
+                f"🟢 {round(len(pos_arts)/total*100)}% &nbsp; "
+                f"🔴 {round(len(neg_arts)/total*100)}% &nbsp; "
+                f"⚪ {round(neu/total*100)}%</div>",
+                unsafe_allow_html=True,
+            )
+            # Highlight the strongest positive and negative stories
+            top_pos = max(pos_arts, key=lambda a: a["relevance_score"], default=None)
+            top_neg = max(neg_arts, key=lambda a: a["relevance_score"], default=None)
+            if top_pos:
+                st.markdown(
+                    f"<div style='font-size:0.76rem; margin-top:6px;'>🟢 <b>Top positive</b><br>"
+                    f"<a href='{top_pos['url']}'>{top_pos['title'][:70]}</a></div>",
+                    unsafe_allow_html=True,
+                )
+            if top_neg:
+                st.markdown(
+                    f"<div style='font-size:0.76rem; margin-top:6px;'>🔴 <b>Top concern</b><br>"
+                    f"<a href='{top_neg['url']}'>{top_neg['title'][:70]}</a></div>",
+                    unsafe_allow_html=True,
+                )
+
+    with c7:
+        with st.container(border=True, height=_WIDGET_HEIGHT):
+            st.markdown("##### 📰 Top Sources")
+            st.caption("Driving the news")
+            src_counts = Counter(a["source"] for a in articles if a["source"])
+            for src, count in src_counts.most_common(5):
+                st.markdown(f"<span style='font-size:0.82rem;'>{src} — **{count}**</span>", unsafe_allow_html=True)
+
+    # ── Row 4: Volume Trend sparkline ────────────────────────────────────────
+    if len(history) >= 3:
+        with st.container(border=True):
+            st.markdown("##### 📉 Volume Trend")
+            totals = [s["total"] for s in history[-20:]]
+            spark = _sparkline(totals)
+            st.markdown(
+                f"<span style='font-size:1.4rem; color:#FF9900; letter-spacing:2px;'>{spark}</span> "
+                f"<span style='font-size:0.8rem; color:#565959;'>total articles tracked over last {len(totals)} scans</span>",
+                unsafe_allow_html=True,
+            )
+
+    # ── Row 5: Latest Headlines Ticker ───────────────────────────────────────
     with st.container(border=True):
         st.markdown("##### 🕐 Latest Headlines")
         recent = sorted(articles, key=lambda a: a["published_ts"], reverse=True)[:5]
@@ -752,11 +1006,19 @@ def render_sidebar() -> tuple[list[str], int, str, bool, bool]:
         st.sidebar.error("No categories registered.")
         st.sidebar.markdown("Register one in the **Manage Categories** tab.")
 
+    # Seed default selection once; clickable widgets update this via session_state.
+    if "selected_categories" not in st.session_state:
+        st.session_state["selected_categories"] = cats[:1] if cats else []
+    # Drop any stale selections no longer in the category list.
+    st.session_state["selected_categories"] = [
+        c for c in st.session_state["selected_categories"] if c in cats
+    ]
+
     selected = st.sidebar.multiselect(
         "Categories",
         options=cats,
-        default=cats[:1] if cats else [],
         help="Pick one or more categories to analyze",
+        key="selected_categories",
     )
 
     days = st.sidebar.select_slider("Lookback period (days)", options=[3, 7, 14, 30], value=7)
@@ -1031,12 +1293,23 @@ def main() -> None:
 
     # ── Run tab ──────────────────────────────────────────────────────────────
     with tab_run:
-        run_btn = st.button("🚀 Generate Report", type="primary", use_container_width=True)
+        btn_col, home_col = st.columns([4, 1])
+        with btn_col:
+            run_btn = st.button("🚀 Generate Report", type="primary", use_container_width=True)
+        with home_col:
+            if st.button("🏠 Home", use_container_width=True, help="Back to the main dashboard"):
+                # Clear report + any expanded widgets and return to a clean view.
+                st.session_state["heat_expanded"] = None
+                st.session_state.pop("run_now", None)
+                st.rerun()
+
+        # A widget click (clickable category) sets run_now to auto-trigger a report.
+        triggered = run_btn or st.session_state.pop("run_now", False)
 
         # ── Report results appear here, directly under the button ──────────────
-        if run_btn and not selected_categories:
+        if triggered and not selected_categories:
             st.warning("👈 Select one or more categories from the sidebar first.")
-        elif run_btn:
+        elif triggered:
             for cat in selected_categories:
                 st.markdown(f"## {cat}")
                 status = st.empty()
